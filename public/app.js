@@ -1087,10 +1087,16 @@ window.__wvSupabaseClient.auth.onAuthStateChange((event) => {
 
 // ---------- PWA install support ----------
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {
+  window.addEventListener('load', async () => {
+    try {
+      const registration = await navigator.serviceWorker.register('/sw.js?v=20260929-2', {
+        scope: '/',
+        updateViaCache: 'none',
+      });
+      await registration.update();
+    } catch {
       // Non-fatal — app still works fully as a normal web page without it
-    });
+    }
   });
 }
 
