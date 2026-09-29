@@ -5,7 +5,7 @@
 const SUPABASE_URL = window.SUPABASE_URL || 'https://YOUR_PROJECT.supabase.co';
 const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || 'YOUR_ANON_KEY';
 
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+window.__wvSupabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 window.__wvAccessToken = null;
 let currentOwner = null;
@@ -85,7 +85,7 @@ function hideAllScreens() {
 
 // ---------- Session expiry (mid-session token invalid/expired) ----------
 async function forceSessionExpired() {
-  await supabaseClient.auth.signOut();
+  await window.__wvSupabaseClient.auth.signOut();
   window.__wvAccessToken = null;
   currentOwner = null;
   hideAllScreens();
@@ -131,6 +131,23 @@ $('back-to-login-link').addEventListener('click', () => {
 });
 
 // ---------- Auth ----------
+async function handleGoogleAuth(e) {
+  e?.preventDefault?.();
+  setError('auth-error', null);
+  const buttons = [$('login-google-btn'), $('signup-google-btn')].filter(Boolean);
+  buttons.forEach((btn) => setBtnLoading(btn, 'Connecting…'));
+  try {
+    const { error } = await window.__wvSupabaseClient.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin + '/' },
+    });
+    if (error) throw error;
+  } catch (err) {
+    setError('auth-error', err.message || 'Google sign-in failed. Please try again.');
+    buttons.forEach((btn) => resetBtn(btn));
+  }
+}
+
 async function handleLogin(e) {
   e.preventDefault();
   setError('auth-error', null);
@@ -140,7 +157,7 @@ async function handleLogin(e) {
 
   setBtnLoading(btn, 'Logging in…');
   try {
-    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    const { data, error } = await window.__wvSupabaseClient.auth.signInWithPassword({ email, password });
     if (error) {
       setError('auth-error', error.message);
       return;
@@ -176,7 +193,7 @@ async function handleSignup(e) {
       throw new Error('The account could not be created. Please try again.');
     }
 
-    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    const { data, error } = await window.__wvSupabaseClient.auth.signInWithPassword({ email, password });
     if (error || !data?.session) {
       throw new Error(error?.message || 'Account created, but automatic login failed. Please use the Login tab.');
     }
@@ -205,7 +222,7 @@ async function handleForgotPassword(e) {
   const btn = $('forgot-submit-btn');
   setBtnLoading(btn, 'Sending…');
   try {
-    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+    const { error } = await window.__wvSupabaseClient.auth.resetPasswordForEmail(email, {
       redirectTo: window.location.origin + '/index.html',
     });
     if (error) {
@@ -227,13 +244,13 @@ async function handleRecoverySubmit(e) {
 
   setBtnLoading(btn, 'Updating…');
   try {
-    const { error } = await supabaseClient.auth.updateUser({ password });
+    const { error } = await window.__wvSupabaseClient.auth.updateUser({ password });
     if (error) {
       setError('recovery-error', error.message);
       return;
     }
     showToast('Password updated. You are now logged in.', 'success');
-    const { data: { session } } = await supabaseClient.auth.getSession();
+    const { data: { session } } = await window.__wvSupabaseClient.auth.getSession();
     if (session) {
       window.__wvAccessToken = session.access_token;
       await enterDashboard();
@@ -462,7 +479,7 @@ async function showAdminScreen() {
 }
 
 async function logout() {
-  await supabaseClient.auth.signOut();
+  await window.__wvSupabaseClient.auth.signOut();
   window.__wvAccessToken = null;
   currentOwner = null;
   hideAllScreens();
@@ -1040,7 +1057,7 @@ document.addEventListener('click', async (e) => {
 });
 
 // ---------- Init ----------
-supabaseClient.auth.onAuthStateChange((event) => {
+window.__wvSupabaseClient.auth.onAuthStateChange((event) => {
   if (event === 'PASSWORD_RECOVERY') {
     hideAllScreens();
     show($('recovery-screen'));
@@ -1064,7 +1081,7 @@ if ('serviceWorker' in navigator) {
     return;
   }
 
-  const { data: { session } } = await supabaseClient.auth.getSession();
+  const { data: { session } } = await window.__wvSupabaseClient.auth.getSession();
   if (session) {
     window.__wvAccessToken = session.access_token;
     await enterDashboard();
