@@ -949,7 +949,15 @@ $('add-router-btn').addEventListener('click', () => {
   openOnboarding();
 });
 $('onboarding-next').addEventListener('click', async () => {
-  if (onboarding.step === onboarding.total) { closeOnboarding(); return; }
+  if (onboarding.step === onboarding.total) {
+    if (onboarding.verified) {
+      closeOnboarding();
+    } else {
+      onboarding.verifying = false;
+      renderOnboarding();
+    }
+    return;
+  }
   await nextOnboarding();
 });
 $('onboarding-back').addEventListener('click', () => {
@@ -1336,11 +1344,7 @@ async function verifyOnboarding() {
     `;
     $('onboarding-next').textContent = 'Retry';
     $('onboarding-next').classList.remove('hidden');
-    $('onboarding-next').onclick = async () => {
-      $('onboarding-next').onclick = null;
-      onboarding.verifying = false;
-      renderOnboarding();
-    };
+
   } finally {
     onboarding.verifying = false;
   }
