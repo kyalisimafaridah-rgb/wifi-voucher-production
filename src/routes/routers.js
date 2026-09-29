@@ -46,14 +46,34 @@ export default async function routerRoutes(fastify) {
       owner_id: request.user.id, label: body.label, host: body.host, api_port: body.api_port, api_tls: apiTls,
       api_username: body.api_username, api_password_encrypted: encryptedPassword,
       last_connected_at: new Date().toISOString(), status: 'connected',
-    }).select('id, label, host, api_port, api_tls, api_username, last_connected_at, status, created_at').single();
+    }).select('id, label, host, api_port, api_tls, api_username, connection_mode, last_connected_at, status, created_at').single();
 
     if (error) return reply.code(error.code === '23505' ? 409 : 500).send({ success: false, error: error.code === '23505' ? 'Duplicate router' : 'Failed to save router', message: error.code === '23505' ? 'This router was just added. Refresh your router list.' : error.message });
     return { success: true, message: 'Router connected and saved successfully', router: data, test: testResult };
   });
 
+  fastify.post('/routers/:id/remote-mode', async (request, reply) => {
+    const { id } = request.params;
+    const { data: router, error } = await request.supabase
+      .from('routers')
+      .select('id, owner_id, connection_mode')
+      .eq('id', id)
+      .eq('owner_id', request.user.id)
+      .single();
+    if (error || !router) return reply.code(404).send({ error: 'Router not found' });
+
+    const { error: updateError } = await request.supabase
+      .from('routers')
+      .update({ connection_mode: 'connector' })
+      .eq('id', id)
+      .eq('owner_id', request.user.id);
+    if (updateError) return reply.code(500).send({ error: updateError.message });
+
+    return { success: true, message: 'Remote connector mode enabled. Generate a connector token next.' };
+  });
+
   fastify.get('/routers', async (request, reply) => {
-    const { data, error } = await request.supabase.from('routers').select('id, label, host, api_port, api_tls, api_username, last_connected_at, status, created_at').eq('owner_id', request.user.id).order('created_at', { ascending: false });
+    const { data, error } = await request.supabase.from('routers').select('id, label, host, api_port, api_tls, api_username, connection_mode, last_connected_at, status, created_at').eq('owner_id', request.user.id).order('created_at', { ascending: false });
     if (error) return reply.code(500).send({ error: error.message });
     return { routers: data };
   });
