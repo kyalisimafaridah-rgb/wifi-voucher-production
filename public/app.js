@@ -516,9 +516,10 @@ async function loadRouters() {
     const agentOnline = agent?.status === 'online';
     const connectorOnline = connector?.status === 'online';
     const endpoint = agentOnline ? '🟢 Cloud Agent online' : connectorOnline ? '🟢 LAN Connector online' : (r.status || '⚪ Waiting for connection');
+    const statusClass = agentOnline || connectorOnline ? 'connected' : (r.status || 'unknown');
     div.innerHTML = `
       <div>
-        <strong><span class="status-dot ${remote && connector?.status === 'online' ? 'connected' : r.status}"></span>${escapeHtml(r.label)}</strong>
+        <strong><span class="status-dot ${statusClass}"></span>${escapeHtml(r.label)}</strong>
         <div class="meta">${agentOnline ? 'Adaptive Cloud Agent · ' : connectorOnline ? 'LAN Connector · ' : (r.host ? escapeHtml(r.host) + ':' + r.api_port + ' · ' : '')}${endpoint} · Last seen: ${lastSeen}</div>
       </div>
       <div class="actions">

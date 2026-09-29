@@ -38,37 +38,65 @@ export default async function routerRoutes(fastify) {
   });
 
   fastify.post('/routers', async (request, reply) => {
-    const body = addRouterSchema.parse(request.body);
-    const apiTls = body.api_tls ?? body.api_port === 8729;
-    const routerHost = body.host || null;
-    const { data: onboardingExisting } = body.connection_mode === 'agent' && body.onboarding_key
-      ? await request.supabase.from('routers').select('id,label,host,api_port,api_tls,api_username,connection_mode,last_connected_at,status,created_at').eq('owner_id', request.user.id).eq('onboarding_key', body.onboarding_key).maybeSingle()
-      : { data: null };
-    if (onboardingExisting) return { success: true, message: 'Existing router setup resumed', router: onboardingExisting };
+    try {
+      const body = addRouterSchema.parse(request.body);
+      const apiTls = body.api_tls ?? body.api_port === 8729;
+      const routerHost = body.host || null;
 
-    const { data: existing } = routerHost
-      ? await request.supabase.from('routers').select('id, label').eq('owner_id', request.user.id).eq('host', routerHost).eq('api_port', body.api_port).maybeSingle()
-      : { data: null };
-    if (existing) return reply.code(409).send({ success: false, error: 'Duplicate router', message: `You already have a router saved for ${body.host}:${body.api_port} (labeled "${existing.label}"). Delete it first if you want to re-add it.` });
-
-    let testResult = null;
-    if (body.connection_mode !== 'agent') {
-      try {
-        testResult = await testConnection({ host: body.host, port: body.api_port, username: body.api_username, password: body.api_password, secure: apiTls });
-      } catch (err) {
-        return reply.code(400).send({ success: false, error: 'Cannot save router — connection test failed', message: err.message, hint: 'Choose Cloud Agent mode if the router is behind CGNAT or has no inbound route.' });
+      if (body.connection_mode === 'agent' && body.onboarding_key) {
+        const { data: onboardingExisting, error: onboardingLookupError } = await request.supabase
+          .from('routers').select('id,label,host,api_port,api_tls,api_username,connection_mode,onboarding_key,last_connected_at,status,created_at')
+          .eq('owner_id', request.user.id).eq('onboarding_key', body.onboarding_key).maybeSingle();
+        if (onboardingLookupError) {
+          request.log.error({ err: onboardingLookupError }, 'Onboarding router lookup failed');
+          return reply.code(500).send({ success:false, error:'Router setup lookup failed', message:'We could not resume this router setup. Please retry.' });
+        }
+        if (onboardingExisting) return { success:true, message:'Existing router setup resumed', router:onboardingExisting };
       }
-    }
-    const encryptedPassword = body.api_password ? encrypt(body.api_password) : null;
-    const { data, error } = await request.supabase.from('routers').insert({
-      owner_id: request.user.id, label: body.label, host: routerHost, api_port: body.api_port, api_tls: apiTls,
-      api_username: body.api_username || null, api_password_encrypted: encryptedPassword,
-      onboarding_key: body.onboarding_key || null,
-      last_connected_at: testResult ? new Date().toISOString() : null, status: testResult ? 'connected' : 'unknown', connection_mode: body.connection_mode === 'agent' ? 'agent' : 'direct',
-    }).select('id, label, host, api_port, api_tls, api_username, connection_mode, onboarding_key, last_connected_at, status, created_at, connector_devices(status, last_seen_at), router_agents(status, last_seen_at, routeros_version, architecture, board_name, agent_version)').single();
 
-    if (error) return reply.code(error.code === '23505' ? 409 : 500).send({ success: false, error: error.code === '23505' ? 'Duplicate router' : 'Failed to save router', message: error.code === '23505' ? 'This router was just added. Refresh your router list.' : error.message });
-    return { success: true, message: 'Router connected and saved successfully', router: data, test: testResult };
+      if (routerHost) {
+        const { data: existing, error: duplicateLookupError } = await request.supabase
+          .from('routers').select('id,label').eq('owner_id', request.user.id).eq('host', routerHost).eq('api_port', body.api_port).maybeSingle();
+        if (duplicateLookupError) {
+          request.log.error({ err: duplicateLookupError }, 'Router duplicate lookup failed');
+          return reply.code(500).send({ success:false, error:'Router lookup failed', message:'We could not check the existing routers. Please retry.' });
+        }
+        if (existing) return reply.code(409).send({ success:false, error:'Duplicate router', message:'A router with this address and port is already saved.' });
+      }
+
+      let testResult = null;
+      if (body.connection_mode !== 'agent') {
+        try {
+          testResult = await testConnection({ host:body.host, port:body.api_port, username:body.api_username, password:body.api_password, secure:apiTls });
+        } catch (err) {
+          return reply.code(400).send({ success:false, error:'Cannot save router — connection test failed', message:err.message, hint:'Choose Cloud Agent mode if the router is behind CGNAT or has no inbound route.' });
+        }
+      }
+
+      const encryptedPassword = body.api_password ? encrypt(body.api_password) : null;
+      const { data, error } = await supabase.from('routers').insert({
+        owner_id:request.user.id, label:body.label, host:routerHost, api_port:body.api_port, api_tls:apiTls,
+        api_username:body.api_username || null, api_password_encrypted:encryptedPassword, onboarding_key:body.onboarding_key || null,
+        last_connected_at:testResult ? new Date().toISOString() : null, status:testResult ? 'connected' : 'unknown',
+        connection_mode:body.connection_mode === 'agent' ? 'agent' : 'direct'
+      }).select('id,label,host,api_port,api_tls,api_username,connection_mode,onboarding_key,last_connected_at,status,created_at').single();
+
+      if (error) {
+        request.log.error({ err:error, ownerId:request.user.id, connectionMode:body.connection_mode }, 'Failed to save router');
+        if (error.code === '23505') {
+          const { data: existing } = await request.supabase.from('routers').select('id,label,host,api_port,api_tls,api_username,connection_mode,onboarding_key,last_connected_at,status,created_at').eq('owner_id',request.user.id).eq('onboarding_key',body.onboarding_key).maybeSingle();
+          if (existing) return { success:true, message:'Existing router setup resumed', router:existing };
+          return reply.code(409).send({ success:false, error:'Duplicate router', message:'This router setup already exists. Refresh and continue.' });
+        }
+        return reply.code(500).send({ success:false, error:'Failed to save router', message:'The server could not save this router setup. Please retry.' });
+      }
+
+      return { success:true, message:'Router setup created successfully', router:data, test:testResult };
+    } catch (err) {
+      request.log.error({ err }, 'Unexpected router creation error');
+      if (err?.name === 'ZodError') return reply.code(400).send({ success:false, error:'Invalid router setup', message:err.issues?.[0]?.message || 'Please check the router setup and try again.' });
+      return reply.code(500).send({ success:false, error:'Router setup failed', message:'The server could not finish this step. Please retry.' });
+    }
   });
 
   fastify.post('/routers/:id/remote-mode', async (request, reply) => {

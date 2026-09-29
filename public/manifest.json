@@ -2,7 +2,7 @@
   "name": "WiFi Voucher",
   "short_name": "WiFi Voucher",
   "description": "Simple hotspot voucher management for MikroTik owners.",
-  "start_url": "/",
+  "start_url": "/?pwa=20260929-2",
   "scope": "/",
   "display": "standalone",
   "background_color": "#06130f",
