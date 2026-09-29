@@ -11,7 +11,8 @@ import { supabase } from '../db/supabase.js';
 export default async function connectorRoutes(fastify) {
   fastify.get('/connector/ws', { websocket: true }, async (socket, request) => {
     try {
-      const token = request.query?.token;
+      const auth = request.headers.authorization || '';
+      const token = auth.startsWith('Bearer ') ? auth.slice(7) : request.query?.token;
       const device = await authenticateConnector(token);
       if (!device) {
         socket.close(4003, 'Invalid connector token');
@@ -65,7 +66,7 @@ export default async function connectorRoutes(fastify) {
       message: 'Connector created. Store this token safely — it is shown only once.',
       connector: data,
       token,
-      websocket_url: process.env.APP_URL.replace(/^http/, 'ws') + '/connector/ws?token=' + encodeURIComponent(token),
+      websocket_url: process.env.APP_URL.replace(/^http/, 'ws') + '/connector/ws',
       setup: {
         server_url: process.env.APP_URL,
         router_label: router.label,
