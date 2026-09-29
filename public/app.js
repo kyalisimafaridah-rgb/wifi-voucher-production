@@ -139,11 +139,20 @@ async function handleGoogleAuth(e) {
   try {
     const { error } = await window.__wvSupabaseClient.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin + '/' },
+      options: {
+        redirectTo: window.location.origin + '/',
+        scopes: 'openid email profile https://www.googleapis.com/auth/userinfo.email',
+      },
     });
     if (error) throw error;
   } catch (err) {
-    setError('auth-error', err.message || 'Google sign-in failed. Please try again.');
+    const msg = err?.message || '';
+    setError(
+      'auth-error',
+      /provider.*not.*enabled|provider is not enabled/i.test(msg)
+        ? 'Google sign-in is not enabled yet. Email login is ready; the app owner needs to finish Google setup in Supabase.'
+        : msg || 'Google sign-in failed. Please try again.'
+    );
     buttons.forEach((btn) => resetBtn(btn));
   }
 }
