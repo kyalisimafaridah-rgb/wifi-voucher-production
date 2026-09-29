@@ -89,7 +89,7 @@ export default async function connectorRoutes(fastify) {
 
   fastify.delete('/routers/:id/connector', async (request, reply) => {
     const { id } = request.params;
-    const { error } = await request.supabase
+    const { error } = await supabase
       .from('connector_devices')
       .delete()
       .eq('router_id', id)
