@@ -7,7 +7,7 @@ const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || 'YOUR_ANON_KEY';
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let accessToken = null;
+let wvAccessToken = null;
 let currentOwner = null;
 let routersCache = [];
 let profilesCache = [];
@@ -20,7 +20,7 @@ async function api(path, options = {}) {
     'Content-Type': 'application/json',
     ...(options.headers || {}),
   };
-  if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+  if (wvAccessToken) headers['Authorization'] = `Bearer ${wvAccessToken}`;
 
   let res;
   try {
@@ -35,7 +35,7 @@ async function api(path, options = {}) {
   let data;
   try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
 
-  if (res.status === 401 && accessToken && !sessionExpiredHandled) {
+  if (res.status === 401 && wvAccessToken && !sessionExpiredHandled) {
     sessionExpiredHandled = true;
     await forceSessionExpired();
   }
@@ -86,7 +86,7 @@ function hideAllScreens() {
 // ---------- Session expiry (mid-session token invalid/expired) ----------
 async function forceSessionExpired() {
   await supabaseClient.auth.signOut();
-  accessToken = null;
+  wvAccessToken = null;
   currentOwner = null;
   hideAllScreens();
   show($('auth-screen'));
@@ -145,7 +145,7 @@ async function handleLogin(e) {
       setError('auth-error', error.message);
       return;
     }
-    accessToken = data.session.access_token;
+    wvAccessToken = data.session.access_token;
     await enterDashboard();
   } finally {
     resetBtn(btn);
@@ -181,7 +181,7 @@ async function handleSignup(e) {
       throw new Error(error?.message || 'Account created, but automatic login failed. Please use the Login tab.');
     }
 
-    accessToken = data.session.access_token;
+    wvAccessToken = data.session.access_token;
     if (full_name) {
       try {
         await api('/me', { method: 'PATCH', body: JSON.stringify({ full_name }) });
@@ -235,7 +235,7 @@ async function handleRecoverySubmit(e) {
     showToast('Password updated. You are now logged in.', 'success');
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (session) {
-      accessToken = session.access_token;
+      wvAccessToken = session.access_token;
       await enterDashboard();
     } else {
       hideAllScreens();
@@ -463,7 +463,7 @@ async function showAdminScreen() {
 
 async function logout() {
   await supabaseClient.auth.signOut();
-  accessToken = null;
+  wvAccessToken = null;
   currentOwner = null;
   hideAllScreens();
   show($('auth-screen'));
@@ -843,7 +843,7 @@ async function generateVouchers() {
 
 function exportVouchers(format) {
   fetch(`/vouchers/export?format=${format}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: { Authorization: `Bearer ${wvAccessToken}` },
   })
     .then((r) => {
       if (!r.ok) throw new Error('Export failed');
@@ -1066,7 +1066,7 @@ if ('serviceWorker' in navigator) {
 
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (session) {
-    accessToken = session.access_token;
+    wvAccessToken = session.access_token;
     await enterDashboard();
   }
 })();
