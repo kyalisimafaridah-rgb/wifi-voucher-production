@@ -16,6 +16,7 @@ import adminRoutes from './routes/admin.js';
 import billingRoutes from './routes/billing.js';
 import momoWebhookRoutes from './routes/momo-webhook.js';
 import connectorRoutes from './routes/connector.js';
+import routerAgentRoutes from './routes/router-agent.js';
 
 dotenv.config();
 
@@ -66,6 +67,7 @@ await app.register(adminRoutes);
 await app.register(billingRoutes);
 await app.register(momoWebhookRoutes);
 await app.register(connectorRoutes);
+await app.register(routerAgentRoutes);
 await app.register(fastifyStatic, { root: join(__dirname, '..', 'public'), prefix: '/', wildcard: false });
 
 app.setErrorHandler((error, request, reply) => {
