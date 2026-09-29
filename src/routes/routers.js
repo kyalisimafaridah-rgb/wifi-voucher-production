@@ -46,7 +46,7 @@ export default async function routerRoutes(fastify) {
       owner_id: request.user.id, label: body.label, host: body.host, api_port: body.api_port, api_tls: apiTls,
       api_username: body.api_username, api_password_encrypted: encryptedPassword,
       last_connected_at: new Date().toISOString(), status: 'connected',
-    }).select('id, label, host, api_port, api_tls, api_username, connection_mode, last_connected_at, status, created_at').single();
+    }).select('id, label, host, api_port, api_tls, api_username, connection_mode, last_connected_at, status, created_at, connector_devices(status, last_seen_at)').single();
 
     if (error) return reply.code(error.code === '23505' ? 409 : 500).send({ success: false, error: error.code === '23505' ? 'Duplicate router' : 'Failed to save router', message: error.code === '23505' ? 'This router was just added. Refresh your router list.' : error.message });
     return { success: true, message: 'Router connected and saved successfully', router: data, test: testResult };
