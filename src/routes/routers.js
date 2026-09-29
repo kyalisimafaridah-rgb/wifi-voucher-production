@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { encrypt, decrypt } from '../utils/encryption.js';
-import { testConnection, deleteHotspotUsers } from '../services/mikrotik.js';
+import { encrypt } from '../utils/encryption.js';
+import { testConnection } from '../services/mikrotik.js';
 import { runAdaptiveRouterOperation } from '../services/router-agent.js';
 import { requireAuth, requireActiveSubscription } from '../middleware/auth.js';
 import { supabase } from '../db/supabase.js';
@@ -43,7 +43,7 @@ export default async function routerRoutes(fastify) {
       } catch (err) {
         return reply.code(400).send({ success: false, error: 'Cannot save router — connection test failed', message: err.message, hint: 'Choose Cloud Agent mode if the router is behind CGNAT or has no inbound route.' });
       }
-    } = encrypt(body.api_password);
+    const encryptedPassword = encrypt(body.api_password);
     const { data, error } = await request.supabase.from('routers').insert({
       owner_id: request.user.id, label: body.label, host: body.host, api_port: body.api_port, api_tls: apiTls,
       api_username: body.api_username, api_password_encrypted: encryptedPassword,
