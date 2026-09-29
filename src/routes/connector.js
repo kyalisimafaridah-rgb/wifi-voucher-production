@@ -45,6 +45,7 @@ export default async function connectorRoutes(fastify) {
 
     if (routerError || !router) return reply.code(404).send({ error: 'Router not found' });
 
+    await supabase.from('routers').update({ connection_mode: 'connector' }).eq('id', id).eq('owner_id', request.user.id);
     const token = createConnectorToken();
     const { data, error } = await supabase.from('connector_devices').upsert({
       owner_id: request.user.id,
@@ -95,6 +96,7 @@ export default async function connectorRoutes(fastify) {
       .eq('owner_id', request.user.id);
 
     if (error) return reply.code(500).send({ error: error.message });
+    await request.supabase.from('routers').update({ connection_mode: 'direct' }).eq('id', id).eq('owner_id', request.user.id);
     return { success: true, message: 'Remote connector revoked.' };
   });
 }
