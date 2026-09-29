@@ -58,6 +58,16 @@ app.get('/config.js', async (request, reply) => {
     `window.BUSINESS_ADDRESS=${JSON.stringify(process.env.BUSINESS_ADDRESS || '')};\n`
   );
 });
+app.get('/supabase-client.js', async (request, reply) => {
+  try {
+    const bundlePath = join(__dirname, '..', 'node_modules', '@supabase', 'supabase-js', 'dist', 'umd', 'supabase.js');
+    const bundle = await readFile(bundlePath, 'utf8');
+    return reply.header('Cache-Control', 'public, max-age=300').type('application/javascript').send(bundle);
+  } catch (error) {
+    request.log.error(error, 'Failed to serve local Supabase browser SDK');
+    return reply.code(500).send({ error: 'Supabase browser SDK unavailable' });
+  }
+});
 app.get('/health', async () => ({ status: 'ok', time: new Date().toISOString(), service: 'wifi-voucher-mvp' }));
 await app.register(authRoutes);
 await app.register(routerRoutes);
