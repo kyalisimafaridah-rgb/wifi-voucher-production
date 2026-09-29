@@ -275,7 +275,7 @@
             <h2>Routers</h2>
             <button id="add-router-btn" class="btn primary">+ Add Router</button>
           </div>
-          <p class="panel-desc">We only save a router after a successful live connection test.</p>
+          <p class="panel-desc">Manage your MikroTik from anywhere. Remote Connector mode works even when the ISP uses CGNAT.</p>
           <div id="routers-list" class="list"><p class="loading-placeholder">Loading routers…</p></div>
         </div>
 
@@ -345,6 +345,39 @@
           </div>
         </form>
         <p id="router-test-result" class="hint"></p>
+      </div>
+    </div>
+
+    <!-- MODAL: Remote Connector -->
+    <div id="modal-connector" class="modal hidden">
+      <div class="modal-card">
+        <h3>Remote Connector</h3>
+        <p class="hint">The connector keeps an outbound secure connection to WiFi Voucher, so you can control this router from another district without exposing RouterOS to the Internet.</p>
+        <div id="connector-status" class="card" style="margin:.75rem 0"></div>
+        <div id="connector-token-section" class="hidden">
+          <label>One-time connector token</label>
+          <textarea id="connector-token" rows="3" readonly></textarea>
+          <p class="hint">This token is shown once. Treat it like a password.</p>
+          <label>WebSocket URL</label>
+          <textarea id="connector-ws-url" rows="3" readonly></textarea>
+          <h4>Run the connector on a computer on the same network as the MikroTik</h4>
+          <label for="connector-router-host">MikroTik local IP / hostname</label>
+          <input id="connector-router-host" placeholder="192.168.88.1" />
+          <label for="connector-router-user">RouterOS API username</label>
+          <input id="connector-router-user" placeholder="wifi-voucher" />
+          <label for="connector-router-pass">RouterOS API password</label>
+          <input id="connector-router-pass" type="password" />
+          <label for="connector-router-port">API port</label>
+          <input id="connector-router-port" value="8729" />
+          <label><input type="checkbox" id="connector-router-tls" checked /> Use secure API (API-SSL)</label>
+          <pre id="connector-env-preview" class="code-block"></pre>
+          <p class="hint">Install Node.js 20+, clone the WiFi Voucher repository, enter these settings in <code>.env</code> inside <code>connector/</code>, then run <code>npm install</code> and <code>npm start</code>.</p>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn primary" id="create-connector-btn">Generate / Rotate Connector</button>
+          <button type="button" class="btn" id="revoke-connector-btn">Revoke</button>
+          <button type="button" class="btn" id="close-connector">Close</button>
+        </div>
       </div>
     </div>
 
