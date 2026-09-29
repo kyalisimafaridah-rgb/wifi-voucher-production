@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
+import websocket from '@fastify/websocket';
 import fastifyStatic from '@fastify/static';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -14,6 +15,7 @@ import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
 import billingRoutes from './routes/billing.js';
 import momoWebhookRoutes from './routes/momo-webhook.js';
+import connectorRoutes from './routes/connector.js';
 
 dotenv.config();
 
@@ -42,6 +44,7 @@ await app.register(cors, {
     cb(null, allowed.has(origin));
   }, credentials: true,
 });
+await app.register(websocket);
 await app.register(rateLimit, { max: 100, timeWindow: '1 minute', addHeaders: { 'x-ratelimit-limit': true, 'x-ratelimit-remaining': true, 'x-ratelimit-reset': true } });
 
 app.get('/config.js', async (request, reply) => {
@@ -62,6 +65,7 @@ await app.register(voucherRoutes);
 await app.register(adminRoutes);
 await app.register(billingRoutes);
 await app.register(momoWebhookRoutes);
+await app.register(connectorRoutes);
 await app.register(fastifyStatic, { root: join(__dirname, '..', 'public'), prefix: '/', wildcard: false });
 
 app.setErrorHandler((error, request, reply) => {
