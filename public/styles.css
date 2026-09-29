@@ -630,3 +630,25 @@ a { color: inherit; }
   font: .82rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
   overflow-x: auto;
 }
+
+
+.onboarding-card { width:min(680px,calc(100% - 1rem)); max-height:90vh; overflow:auto; }
+.onboarding-progress { display:flex; align-items:center; gap:.8rem; margin-bottom:1.2rem; color:var(--muted); font-size:.75rem; }
+.progress-track { flex:1; height:6px; background:#102c22; border-radius:99px; overflow:hidden; }
+.progress-track i { display:block; height:100%; width:20%; background:#34d399; transition:width .2s ease; }
+.onboarding-hero h2,.onboarding-card h2 { font-size:clamp(1.45rem,4vw,2rem); margin:.35rem 0 .65rem; }
+.onboarding-hero p { color:var(--muted); line-height:1.65; }
+.onboarding-checks { display:grid; grid-template-columns:repeat(2,1fr); gap:.7rem; margin:1.25rem 0; }
+.onboarding-checks div { padding:.85rem; border:1px solid var(--border); border-radius:12px; background:#0b2119; color:#c9eee0; font-size:.86rem; }
+.onboarding-options { display:grid; gap:.7rem; margin:1rem 0; }
+.onboarding-option { display:block; padding:1rem; border:1px solid var(--border); border-radius:13px; cursor:pointer; background:#0b2119; }
+.onboarding-option:has(input:checked) { border-color:#2f9e76; box-shadow:0 0 0 1px #2f9e76 inset; }
+.onboarding-option input { margin-right:.5rem; }
+.onboarding-option strong,.onboarding-option span { display:block; margin-left:1.5rem; }
+.onboarding-option span { color:var(--muted); font-size:.82rem; line-height:1.5; margin-top:.25rem; }
+.onboarding-callout { padding:.9rem; border-radius:12px; background:#0b2a20; border:1px solid #1a5a43; color:#bfe9d8; font-size:.82rem; line-height:1.55; margin-top:1rem; }
+.onboarding-result { padding:.25rem 0; }
+.onboarding-result.error { color:#fecaca; }
+.onboarding-result input,.onboarding-result textarea { width:100%; margin-top:.5rem; }
+.onboarding-actions { margin-top:1.25rem; }
+@media (max-width:640px){ .onboarding-checks{grid-template-columns:1fr;} .onboarding-actions{flex-wrap:wrap;} .onboarding-actions #onboarding-next{margin-left:auto;} }
