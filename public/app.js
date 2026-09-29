@@ -22,7 +22,15 @@ async function api(path, options = {}) {
   };
   if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
-  let res;\n  try {\n    res = await fetch(path, { ...options, headers });\n  } catch (networkErr) {\n    const err = new Error('Network request failed. Check your Internet connection and try again.');\n    err.code = 'NETWORK_ERROR';\n    err.original = networkErr?.message;\n    throw err;\n  }
+  let res;
+  try {
+    res = await fetch(path, { ...options, headers });
+  } catch (networkErr) {
+    const err = new Error('Network request failed. Check your Internet connection and try again.');
+    err.code = 'NETWORK_ERROR';
+    err.original = networkErr?.message;
+    throw err;
+  }
   const text = await res.text();
   let data;
   try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
