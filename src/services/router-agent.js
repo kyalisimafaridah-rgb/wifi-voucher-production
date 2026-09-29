@@ -73,7 +73,11 @@ export async function runAdaptiveRouterOperation(router, operation, payload={}, 
   const { data: agent } = await supabase.from('router_agents')
     .select('id,status,last_seen_at').eq('router_id',router.id).maybeSingle();
   if(agent?.status==='online' && agent.last_seen_at && Date.now()-new Date(agent.last_seen_at).getTime()<90000){
-    try { return await queueAgentCommand(agent.id,operation,payload,timeoutMs); } catch {}
+    try { return await queueAgentCommand(agent.id,operation,payload,timeoutMs); }
+    catch (err) {
+      if (!['AGENT_TIMEOUT','AGENT_COMMAND_FAILED'].includes(err.code)) throw err;
+      if (err.code === 'AGENT_COMMAND_FAILED') throw err;
+    }
   }
 
   // 2) Existing outbound LAN connector.
@@ -81,7 +85,10 @@ export async function runAdaptiveRouterOperation(router, operation, payload={}, 
     const { data: device } = await supabase.from('connector_devices').select('id,status').eq('router_id',router.id).maybeSingle();
     if(device?.status==='online'){
       const { sendConnectorCommand } = await import('./connector.js');
-      try { return await sendConnectorCommand(device.id,operation,payload,timeoutMs); } catch {}
+      try { return await sendConnectorCommand(device.id,operation,payload,timeoutMs); }
+      catch (err) {
+        if (err.code === 'CONNECTOR_COMMAND_FAILED') throw err;
+      }
     }
   }
 
