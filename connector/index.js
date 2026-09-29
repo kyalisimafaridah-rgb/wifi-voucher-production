@@ -18,6 +18,7 @@ const router = {
 
 let reconnectDelay = 1000;
 let stopping = false;
+let heartbeatTimer = null;
 
 function connect() {
   if (stopping) return;
@@ -34,7 +35,7 @@ function connect() {
       ws.send(JSON.stringify({ type: 'result', requestId: message.requestId, ok: false, code: err.code || 'ROUTER_COMMAND_FAILED', error: err.message || 'Router command failed' }));
     }
   });
-  ws.on('close', () => { if (stopping) return; console.log('Cloud connection closed; reconnecting...'); setTimeout(connect, reconnectDelay); reconnectDelay = Math.min(reconnectDelay * 2, 30000); });
+  ws.on('close', () => { clearInterval(heartbeatTimer); if (stopping) return; console.log('Cloud connection closed; reconnecting...'); setTimeout(connect, reconnectDelay); reconnectDelay = Math.min(reconnectDelay * 2, 30000); });
   ws.on('error', (err) => console.error('Connector network error:', err.message));
   ws.on('ping', () => { try { ws.pong(); } catch {} });
 }
