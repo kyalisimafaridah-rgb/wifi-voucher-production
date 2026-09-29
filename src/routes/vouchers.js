@@ -1,11 +1,8 @@
 import { z } from 'zod';
 import crypto from 'crypto';
 import { requireAuth, requireActiveSubscription } from '../middleware/auth.js';
-import { decrypt } from '../utils/encryption.js';
+import { runRouterOperation } from '../services/connector.js';
 import {
-  testConnection,
-  createHotspotUsers,
-  getHotspotUserUsage,
   minutesToUptime,
   mbToBytes,
 } from '../services/mikrotik.js';
@@ -88,7 +85,7 @@ export default async function voucherRoutes(fastify) {
       .select(`
         *,
         routers!inner (
-          id, host, api_port, api_username, api_password_encrypted, status, owner_id
+          id, host, api_port, api_tls, api_username, api_password_encrypted, connection_mode, status, owner_id
         )
       `)
       .eq('id', body.profile_id)
@@ -120,27 +117,11 @@ export default async function voucherRoutes(fastify) {
       });
     }
 
-    // 3. Decrypt credentials
-    let password;
+    // 3. Verify the router path. Connector mode checks the outbound connector;
+    // direct mode checks RouterOS directly.
     try {
-      password = decrypt(router.api_password_encrypted);
-    } catch (e) {
-      return reply.code(500).send({
-        error: 'Failed to decrypt router credentials',
-        message: 'Please re-add the router.',
-      });
-    }
-
-    // 4. Live connection test (never skip this)
-    try {
-      await testConnection({
-        host: router.host,
-        port: router.api_port,
-        username: router.api_username,
-        password,
-      });
+      await runRouterOperation(router, 'test');
     } catch (err) {
-      // Log the failed attempt
       await request.supabase.from('voucher_generation_logs').insert({
         owner_id: ownerId,
         router_id: router.id,
@@ -148,18 +129,12 @@ export default async function voucherRoutes(fastify) {
         success: false,
         error_message: err.message,
       });
-
-      // Mark router unreachable
-      await request.supabase
-        .from('routers')
-        .update({ status: 'unreachable' })
-        .eq('id', router.id);
-
+      await request.supabase.from('routers').update({ status: 'unreachable' }).eq('id', router.id);
       return reply.code(400).send({
         success: false,
-        error: 'Router unreachable',
+        error: router.connection_mode === 'connector' ? 'Remote router unavailable' : 'Router unreachable',
         message: err.message,
-        hint: 'Vouchers were NOT created. Fix the router connection and try again. This is intentional — we never create orphan vouchers.',
+        hint: 'Vouchers were NOT created. Check the router or connector connection and try again.',
       });
     }
 
@@ -182,13 +157,7 @@ export default async function voucherRoutes(fastify) {
     // 6. Create on the router FIRST
     let createResult;
     try {
-      createResult = await createHotspotUsers({
-        host: router.host,
-        port: router.api_port,
-        username: router.api_username,
-        password,
-        users: mikrotikUsers,
-      });
+      createResult = await runRouterOperation(router, 'create_users', { users: mikrotikUsers }, 30000);
     } catch (err) {
       await request.supabase.from('voucher_generation_logs').insert({
         owner_id: ownerId,
@@ -284,7 +253,7 @@ export default async function voucherRoutes(fastify) {
 
     const { data: router, error: routerError } = await request.supabase
       .from('routers')
-      .select('id, host, api_port, api_username, api_password_encrypted')
+      .select('id, host, api_port, api_tls, api_username, api_password_encrypted, connection_mode')
       .eq('id', router_id)
       .eq('owner_id', ownerId)
       .single();
@@ -309,22 +278,12 @@ export default async function voucherRoutes(fastify) {
       return { success: true, message: 'Nothing to sync', updated: 0 };
     }
 
-    let password;
-    try {
-      password = decrypt(router.api_password_encrypted);
-    } catch (e) {
-      return reply.code(500).send({ error: 'Failed to decrypt router credentials' });
-    }
-
     let usage;
     try {
-      usage = await getHotspotUserUsage({
-        host: router.host,
-        port: router.api_port,
-        username: router.api_username,
-        password,
+      usage = await runRouterOperation(router, 'usage', {
         codes: vouchers.map((v) => v.code),
-      });
+      }, 20000);
+;
     } catch (err) {
       return reply.code(400).send({
         error: 'Router unreachable',
