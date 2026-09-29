@@ -925,6 +925,8 @@ async function exportPdf() {
 // ---------- Events ----------
 $('login-form').addEventListener('submit', handleLogin);
 $('signup-form').addEventListener('submit', handleSignup);
+$('login-google-btn')?.addEventListener('click', handleGoogleAuth);
+$('signup-google-btn')?.addEventListener('click', handleGoogleAuth);
 $('forgot-form').addEventListener('submit', handleForgotPassword);
 $('recovery-form').addEventListener('submit', handleRecoverySubmit);
 $('logout-btn').addEventListener('click', logout);
