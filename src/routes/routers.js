@@ -13,6 +13,7 @@ const addRouterSchema = z.object({
   api_username: z.string().max(100).optional().nullable(),
   api_password: z.string().max(200).optional().nullable(),
   connection_mode: z.enum(['direct','agent']).optional().default('direct'),
+  onboarding_key: z.string().uuid().optional().nullable(),
 }).superRefine((body, ctx) => {
   if (body.connection_mode === 'direct') {
     if (!body.host) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['host'], message: 'Router address is required for direct connection.' });
@@ -40,6 +41,11 @@ export default async function routerRoutes(fastify) {
     const body = addRouterSchema.parse(request.body);
     const apiTls = body.api_tls ?? body.api_port === 8729;
     const routerHost = body.host || null;
+    const { data: onboardingExisting } = body.connection_mode === 'agent' && body.onboarding_key
+      ? await request.supabase.from('routers').select('id,label,host,api_port,api_tls,api_username,connection_mode,last_connected_at,status,created_at').eq('owner_id', request.user.id).eq('onboarding_key', body.onboarding_key).maybeSingle()
+      : { data: null };
+    if (onboardingExisting) return { success: true, message: 'Existing router setup resumed', router: onboardingExisting };
+
     const { data: existing } = routerHost
       ? await request.supabase.from('routers').select('id, label').eq('owner_id', request.user.id).eq('host', routerHost).eq('api_port', body.api_port).maybeSingle()
       : { data: null };
@@ -57,8 +63,9 @@ export default async function routerRoutes(fastify) {
     const { data, error } = await request.supabase.from('routers').insert({
       owner_id: request.user.id, label: body.label, host: routerHost, api_port: body.api_port, api_tls: apiTls,
       api_username: body.api_username || null, api_password_encrypted: encryptedPassword,
+      onboarding_key: body.onboarding_key || null,
       last_connected_at: testResult ? new Date().toISOString() : null, status: testResult ? 'connected' : 'unknown', connection_mode: body.connection_mode === 'agent' ? 'agent' : 'direct',
-    }).select('id, label, host, api_port, api_tls, api_username, connection_mode, last_connected_at, status, created_at, connector_devices(status, last_seen_at), router_agents(status, last_seen_at, routeros_version, architecture)').single();
+    }).select('id, label, host, api_port, api_tls, api_username, connection_mode, onboarding_key, last_connected_at, status, created_at, connector_devices(status, last_seen_at), router_agents(status, last_seen_at, routeros_version, architecture, board_name, agent_version)').single();
 
     if (error) return reply.code(error.code === '23505' ? 409 : 500).send({ success: false, error: error.code === '23505' ? 'Duplicate router' : 'Failed to save router', message: error.code === '23505' ? 'This router was just added. Refresh your router list.' : error.message });
     return { success: true, message: 'Router connected and saved successfully', router: data, test: testResult };
@@ -85,7 +92,7 @@ export default async function routerRoutes(fastify) {
   });
 
   fastify.get('/routers', async (request, reply) => {
-    const { data, error } = await request.supabase.from('routers').select('id, label, host, api_port, api_tls, api_username, connection_mode, last_connected_at, status, created_at').eq('owner_id', request.user.id).order('created_at', { ascending: false });
+    const { data, error } = await request.supabase.from('routers').select('id, label, host, api_port, api_tls, api_username, connection_mode, onboarding_key, last_connected_at, status, created_at, connector_devices(status, last_seen_at), router_agents(status, last_seen_at, routeros_version, architecture, board_name, agent_version)').eq('owner_id', request.user.id).order('created_at', { ascending: false });
     if (error) return reply.code(500).send({ error: error.message });
     return { routers: data };
   });

@@ -16,13 +16,11 @@ export async function authenticateAgent(token) {
 }
 
 export async function agentHeartbeat(agentId, meta = {}) {
-  await supabase.from('router_agents').update({
-    status:'online',
-    last_seen_at:new Date().toISOString(),
-    routeros_version: meta.routeros_version || null,
-    architecture: meta.architecture || null,
-    board_name: meta.board_name || null,
-  }).eq('id', agentId);
+  const patch = { status:'online', last_seen_at:new Date().toISOString(), last_error:null, last_error_at:null };
+  for (const key of ['routeros_version','architecture','board_name','agent_version','last_ip']) {
+    if (meta[key] !== undefined) patch[key] = meta[key];
+  }
+  await supabase.from('router_agents').update(patch).eq('id', agentId);
 }
 
 export async function registerAgent(agentId, meta) {
@@ -30,32 +28,29 @@ export async function registerAgent(agentId, meta) {
 }
 
 export async function queueAgentCommand(agentId, operation, payload = {}, timeoutMs = 30000) {
+  if (JSON.stringify(payload).length > 65536) throw Object.assign(new Error('Router command payload is too large'), { code:'AGENT_PAYLOAD_TOO_LARGE' });
+  const expiresAt = new Date(Date.now() + timeoutMs + 15000).toISOString();
   const { data, error } = await supabase.from('router_agent_commands').insert({
-    agent_id:agentId, operation, payload, status:'queued'
+    agent_id:agentId, operation, payload, status:'queued', expires_at:expiresAt
   }).select('id').single();
   if (error) throw Object.assign(new Error(error.message), { code:'AGENT_QUEUE_FAILED' });
-
   const deadline=Date.now()+timeoutMs;
   while(Date.now()<deadline){
-    const { data: row } = await supabase.from('router_agent_commands')
-      .select('status,result,error_message').eq('id',data.id).single();
+    const { data: row } = await supabase.from('router_agent_commands').select('status,result,error_message').eq('id',data.id).single();
     if(row?.status==='succeeded') return row.result;
     if(row?.status==='failed') throw Object.assign(new Error(row.error_message || 'Router agent command failed'),{code:'AGENT_COMMAND_FAILED'});
+    if(row?.status==='expired') throw Object.assign(new Error(row.error_message || 'Router agent command expired'),{code:'AGENT_TIMEOUT'});
     await new Promise(r=>setTimeout(r,1000));
   }
-  await supabase.from('router_agent_commands').update({status:'expired',error_message:'Command timed out',completed_at:new Date().toISOString()}).eq('id',data.id).eq('status','queued');
+  await supabase.from('router_agent_commands').update({status:'expired',error_message:'Command timed out',completed_at:new Date().toISOString()}).eq('id',data.id).in('status',['queued','running']);
   throw Object.assign(new Error('Router agent command timed out'),{code:'AGENT_TIMEOUT'});
 }
 
 export async function pollAgent(agentId) {
-  const { data } = await supabase.from('router_agent_commands')
-    .select('id,operation,payload').eq('agent_id',agentId).eq('status','queued')
-    .order('created_at',{ascending:true}).limit(1).maybeSingle();
+  await supabase.from('router_agent_commands').update({status:'expired',error_message:'Command expired before delivery',completed_at:new Date().toISOString()}).eq('agent_id',agentId).eq('status','queued').lt('expires_at',new Date().toISOString());
+  const { data } = await supabase.from('router_agent_commands').select('id,operation,payload,expires_at').eq('agent_id',agentId).eq('status','queued').order('created_at',{ascending:true}).limit(1).maybeSingle();
   if(!data) return null;
-  const { data: claimed } = await supabase.from('router_agent_commands')
-    .update({status:'running',started_at:new Date().toISOString()})
-    .eq('id',data.id).eq('status','queued')
-    .select('id,operation,payload').maybeSingle();
+  const { data: claimed } = await supabase.from('router_agent_commands').update({status:'running',started_at:new Date().toISOString(),claimed_at:new Date().toISOString()}).eq('id',data.id).eq('status','queued').select('id,operation,payload,expires_at').maybeSingle();
   return claimed || null;
 }
 
@@ -65,7 +60,7 @@ export async function completeAgentCommand(commandId, ok, result, errorMessage) 
     result:ok?(result ?? {}):null,
     error_message:ok?null:(errorMessage || 'Agent command failed'),
     completed_at:new Date().toISOString()
-  }).eq('id',commandId).eq('status','running');
+  }).eq('id',commandId).eq('status','running').gt('expires_at',new Date().toISOString());
 }
 
 

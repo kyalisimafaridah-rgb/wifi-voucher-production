@@ -105,3 +105,8 @@ If connection is unreliable because of CGNAT → switch architecture to a “pho
 
 ## Out of scope for v1
 Thermal printing, QR codes, multi-staff, analytics dashboards, captive portal editor, Flutterwave.
+
+
+## Adaptive router connectivity
+
+The production path uses an automatic hierarchy: Cloud Agent (outbound HTTPS) → LAN Connector → direct secure RouterOS API/API-SSL. The Cloud Agent installer persists a RouterOS 7 script plus scheduler and recovers after reboots and public-IP changes. RouterOS 6 is handled through the fallback paths until a dedicated v6 agent is implemented. Physical RouterOS validation is still required before claiming universal hardware compatibility.

@@ -512,13 +512,14 @@ async function loadRouters() {
     div.className = 'list-item';
     const lastSeen = r.last_connected_at ? new Date(r.last_connected_at).toLocaleString() : 'Never';
     const connector = Array.isArray(r.connector_devices) ? r.connector_devices[0] : r.connector_devices;
-    const remote = r.connection_mode === 'connector';
-    const remoteStatus = connector?.status === 'online' ? '🟢 Remote online' : '⚪ Remote offline';
-    const endpoint = remote ? remoteStatus : (r.status || 'unknown');
+    const agent = Array.isArray(r.router_agents) ? r.router_agents[0] : r.router_agents;
+    const agentOnline = agent?.status === 'online';
+    const connectorOnline = connector?.status === 'online';
+    const endpoint = agentOnline ? '🟢 Cloud Agent online' : connectorOnline ? '🟢 LAN Connector online' : (r.status || '⚪ Waiting for connection');
     div.innerHTML = `
       <div>
         <strong><span class="status-dot ${remote && connector?.status === 'online' ? 'connected' : r.status}"></span>${escapeHtml(r.label)}</strong>
-        <div class="meta">${remote ? 'Remote Connector · ' : escapeHtml(r.host) + ':' + r.api_port + ' · '}${endpoint} · Last seen: ${lastSeen}</div>
+        <div class="meta">${agentOnline ? 'Adaptive Cloud Agent · ' : connectorOnline ? 'LAN Connector · ' : (r.host ? escapeHtml(r.host) + ':' + r.api_port + ' · ' : '')}${endpoint} · Last seen: ${lastSeen}</div>
       </div>
       <div class="actions">
         <button class="btn small" data-retest="${r.id}">Re-test</button>
@@ -1115,6 +1116,7 @@ if ('serviceWorker' in navigator) {
 const onboarding = {
   step: 1,
   total: 4,
+  key: null,
   router: null,
   agent: null,
   label: '',
@@ -1125,6 +1127,8 @@ const onboarding = {
 
 function openOnboarding() {
   onboarding.step = 1;
+  onboarding.key = localStorage.getItem('wv_onboarding_key') || crypto.randomUUID();
+  localStorage.setItem('wv_onboarding_key', onboarding.key);
   onboarding.router = null;
   onboarding.agent = null;
   onboarding.label = '';
@@ -1137,7 +1141,13 @@ function openOnboarding() {
 
 function closeOnboarding(skip = false) {
   hide($('modal-onboarding'));
-  if (skip) localStorage.setItem('wv_onboarding_skipped', '1');
+  if (skip) {
+    localStorage.setItem('wv_onboarding_skipped', '1');
+  } else if (onboarding.verified) {
+    localStorage.removeItem('wv_onboarding_key');
+    localStorage.removeItem('wv_onboarding_skipped');
+    localStorage.setItem('wv_onboarding_complete', '1');
+  }
 }
 
 function onboardingError(err, fallback = 'Setup could not continue.') {
@@ -1167,7 +1177,7 @@ function renderOnboarding() {
       <div class="onboarding-hero">
         <span class="eyebrow">Automatic setup</span>
         <h2 id="onboarding-title">Let’s connect your WiFi router.</h2>
-        <p>You do not need to know your router version, IP address, firewall settings or ISP type. WiFi Voucher will detect those things for you.</p>
+        <p>You do not need to know your router version, IP address, firewall settings or ISP type. WiFi Voucher will detect those things for you and automatically recover when your Internet address changes.</p>
       </div>
       <div class="onboarding-checks">
         <div>✓ Detect router version</div>
@@ -1184,7 +1194,7 @@ function renderOnboarding() {
       <p class="hint">For example: Shop, Cafe, Hostel or Office.</p>
       <label for="ob-label">Router name</label>
       <input id="ob-label" maxlength="100" value="${escapeHtml(onboarding.label)}" placeholder="My Shop" autocomplete="off" />
-      <div class="onboarding-callout"><strong>Next:</strong> we will create a private connection for this router. You will paste one generated setup script into the router.</div>
+      <div class="onboarding-callout"><strong>Next:</strong> we will create a private connection for this router. You will paste one generated setup script into the router once. It will install a persistent connection and restart automatically after router reboots.</div>
     `;
     $('ob-label').focus();
   } else if (s === 3) {
@@ -1247,6 +1257,7 @@ async function provisionOnboarding() {
         connection_mode: 'agent',
         api_port: 8729,
         api_tls: true,
+        onboarding_key: onboarding.key,
       }),
     });
     onboarding.router = saved.router;
@@ -1285,6 +1296,7 @@ async function verifyOnboarding() {
 
   try {
     if (!onboarding.router) throw new Error('No router connection was created.');
+    if (!onboarding.provisioned) { onboarding.step = 3; renderOnboarding(); return; }
 
     const deadline = Date.now() + 90000;
     let agent = null;

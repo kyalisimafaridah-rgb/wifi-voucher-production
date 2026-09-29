@@ -202,14 +202,20 @@ export default async function voucherRoutes(fastify) {
       .select('id, code, status, created_at');
 
     if (saveError) {
-      // This is bad — users exist on router but not in our DB.
-      // In production we would try to clean up or log heavily.
-      console.error('CRITICAL: Users created on router but failed to save to DB', saveError);
+      let cleanup = null;
+      try {
+        cleanup = await runAdaptiveRouterOperation(router, 'delete_users', { names: successfulCodes }, 30000);
+      } catch (cleanupError) {
+        cleanup = { deleted: [], errors: [{ code: 'CLEANUP_FAILED', error: cleanupError.message }] };
+      }
+      console.error('CRITICAL: Router voucher users reconciled after DB save failure', { saveError, cleanup });
       return reply.code(500).send({
         success: false,
-        error: 'Users created on router but failed to save records',
-        message: 'Contact support. Some codes may exist on the router.',
-        codes: successfulCodes, // still return them so owner can use them
+        error: 'Voucher records could not be saved safely',
+        message: cleanup?.errors?.length
+          ? 'The router could not be fully reconciled. Contact support before selling these codes.'
+          : 'Voucher creation was rolled back because the database could not save the records.',
+        cleanup,
       });
     }
 
