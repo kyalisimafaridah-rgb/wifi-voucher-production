@@ -423,31 +423,7 @@
     </div>
   </div>
 
-  <!-- Keep auth-tab switching independent from Supabase/app loading. This makes the Login/Sign up mini-page usable even if a third-party script is slow or blocked. -->
-  <script>
-    (function () {
-      function bindAuthTabs() {
-        var tabs = document.querySelectorAll('.tab');
-        var login = document.getElementById('login-form');
-        var signup = document.getElementById('signup-form');
-        var forgot = document.getElementById('forgot-form');
-        var error = document.getElementById('auth-error');
-        if (!tabs.length || !login || !signup) return;
-        tabs.forEach(function (tab) {
-          tab.addEventListener('click', function () {
-            var isLogin = tab.getAttribute('data-tab') === 'login';
-            tabs.forEach(function (t) { t.classList.toggle('active', t === tab); });
-            login.classList.toggle('hidden', !isLogin);
-            signup.classList.toggle('hidden', isLogin);
-            if (forgot) forgot.classList.add('hidden');
-            if (error) { error.classList.add('hidden'); error.textContent = ''; }
-          });
-        });
-      }
-      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindAuthTabs);
-      else bindAuthTabs();
-    })();
-  </script>
+  <script src="/auth-tabs.js?v=20260929-3"></script>
   <script src="/config.js?v=20260929-2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/toast.js?v=20260929-2"></script>
