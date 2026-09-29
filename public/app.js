@@ -1050,3 +1050,85 @@ if ('serviceWorker' in navigator) {
     await enterDashboard();
   }
 })();
+
+
+// ---------- Adaptive onboarding wizard ----------
+const onboarding = { step: 1, total: 5, router: null, mode: 'auto', diagnosis: {} };
+function openOnboarding() {
+  onboarding.step = 1; onboarding.router = null; onboarding.mode = 'auto'; onboarding.diagnosis = {};
+  show($('modal-onboarding')); renderOnboarding();
+}
+function closeOnboarding(skip = false) {
+  hide($('modal-onboarding'));
+  if (skip) localStorage.setItem('wv_onboarding_skipped', '1');
+}
+function renderOnboarding() {
+  const s = onboarding.step;
+  $('onboarding-step-label').textContent = `Step ${s} of ${onboarding.total}`;
+  $('onboarding-progress-bar').style.width = `${(s / onboarding.total) * 100}%`;
+  $('onboarding-back').classList.toggle('hidden', s === 1);
+  $('onboarding-skip').classList.toggle('hidden', s === onboarding.total);
+  $('onboarding-next').textContent = s === onboarding.total ? 'Finish setup' : 'Continue';
+  const body = $('onboarding-body');
+  const d = onboarding.diagnosis;
+  if (s === 1) {
+    body.innerHTML = `<div class="onboarding-hero"><span class="eyebrow">Adaptive setup</span><h2 id="onboarding-title">Let’s connect your MikroTik the right way.</h2><p>We’ll check the router, ISP/network conditions and available connection paths, then guide you through the path that fits.</p></div><div class="onboarding-checks"><div>✓ RouterOS version & hardware</div><div>✓ Internet / outbound HTTPS</div><div>✓ Public IP, CGNAT & firewall conditions</div><div>✓ Direct API, Cloud Agent or LAN Connector</div></div>`;
+  } else if (s === 2) {
+    body.innerHTML = `<h2>What do you know about the connection?</h2><p class="hint">These answers help us choose the first path. We can still test alternatives.</p><label>RouterOS version (if known)</label><select id="ob-version"><option value="unknown">I don’t know</option><option value="7">RouterOS 7.x</option><option value="6">RouterOS 6.x</option></select><label>Can the router reach the public Internet?</label><select id="ob-internet"><option value="yes">Yes</option><option value="no">No / not sure</option></select><label>Does the ISP use CGNAT or block inbound ports?</label><select id="ob-cgnat"><option value="unknown">I don’t know</option><option value="yes">Yes / likely</option><option value="no">No / public IP available</option></select><label>Can you run commands on the MikroTik?</label><select id="ob-admin"><option value="yes">Yes</option><option value="no">No</option></select>`;
+    $('ob-version').value = d.version || 'unknown'; $('ob-internet').value = d.internet || 'yes'; $('ob-cgnat').value = d.cgnat || 'unknown'; $('ob-admin').value = d.admin || 'yes';
+  } else if (s === 3) {
+    body.innerHTML = `<h2>Router details</h2><p class="hint">Credentials are encrypted on the server. They are used for direct testing/fallback; the Cloud Agent itself does not need your API password to operate.</p><label>Router label</label><input id="ob-label" value="${escapeHtml(d.label || '')}" placeholder="Shop Router" /><label>Host / IP / DDNS</label><input id="ob-host" value="${escapeHtml(d.host || '')}" placeholder="192.168.88.1 or shop.example.com" /><label>API port</label><input id="ob-port" type="number" value="${d.port || 8729}" /><label>API username</label><input id="ob-user" value="${escapeHtml(d.user || '')}" autocomplete="off" /><label>API password</label><div class="password-field"><input id="ob-pass" type="password" value="" autocomplete="new-password" /><button type="button" class="password-toggle" data-toggle-for="ob-pass">Show</button></div><p class="field-hint">If direct testing is blocked, we can still use the saved credentials as a fallback path.</p>`;
+  } else if (s === 4) {
+    const suggested = (d.version === '7' && d.internet !== 'no' && d.admin !== 'no') ? 'agent' : ((d.cgnat === 'yes' || d.cgnat === 'unknown') ? 'connector' : 'direct');
+    body.innerHTML = `<h2>Choose the connection path</h2><p class="hint">We’ll start with the selected path and keep the other supported paths available as fallbacks.</p><div class="onboarding-options"><label class="onboarding-option"><input type="radio" name="ob-mode" value="agent" ${suggested === 'agent' ? 'checked' : ''}/><strong>Cloud Agent</strong><span>Best when RouterOS 7 can make outbound HTTPS calls. Works behind CGNAT and does not require an inbound port.</span></label><label class="onboarding-option"><input type="radio" name="ob-mode" value="direct" ${suggested === 'direct' ? 'checked' : ''}/><strong>Direct API / API-SSL</strong><span>Use when the router is reachable from the Internet or from the server network.</span></label><label class="onboarding-option"><input type="radio" name="ob-mode" value="connector" ${suggested === 'connector' ? 'checked' : ''}/><strong>LAN Connector</strong><span>Use a small always-on computer inside the router’s LAN when the router cannot phone home itself.</span></label></div><div class="onboarding-callout"><strong>Adaptive fallback:</strong> If the selected route cannot be established, the wizard will tell you what condition is blocking it and show the next available route.</div>`;
+    const radio=document.querySelector('input[name="ob-mode"][value="'+(onboarding.mode==='auto'?suggested:onboarding.mode)+'"]'); if(radio) radio.checked=true;
+  } else {
+    const mode = onboarding.mode;
+    body.innerHTML = `<h2>Finish the connection</h2><div id="onboarding-finish-content"><p>Saving the router and preparing your ${mode === 'agent' ? 'Cloud Agent' : mode === 'connector' ? 'LAN Connector' : 'direct API'} setup…</p></div>`;
+    finishOnboarding();
+  }
+}
+function collectOnboardingStep() {
+  if (onboarding.step === 2) {
+    onboarding.diagnosis.version=$('ob-version').value; onboarding.diagnosis.internet=$('ob-internet').value; onboarding.diagnosis.cgnat=$('ob-cgnat').value; onboarding.diagnosis.admin=$('ob-admin').value;
+  }
+  if (onboarding.step === 3) {
+    onboarding.diagnosis.label=$('ob-label').value.trim(); onboarding.diagnosis.host=$('ob-host').value.trim(); onboarding.diagnosis.port=Number($('ob-port').value)||8729; onboarding.diagnosis.user=$('ob-user').value.trim(); onboarding.diagnosis.pass=$('ob-pass').value;
+    if(!onboarding.diagnosis.label||!onboarding.diagnosis.host||!onboarding.diagnosis.user||!onboarding.diagnosis.pass){ $('onboarding-status').textContent='Please complete the router details first.'; return false; }
+  }
+  if (onboarding.step === 4) { onboarding.mode=document.querySelector('input[name="ob-mode"]:checked')?.value||'agent'; }
+  return true;
+}
+async function nextOnboarding() {
+  $('onboarding-status').textContent='';
+  if(!collectOnboardingStep()) return;
+  if(onboarding.step < onboarding.total){ onboarding.step++; renderOnboarding(); }
+}
+async function finishOnboarding(){
+  const out=$('onboarding-finish-content');
+  try {
+    const d=onboarding.diagnosis;
+    const body={label:d.label,host:d.host,api_port:d.port,api_username:d.user,api_password:d.pass,connection_mode:onboarding.mode==='agent'?'agent':'direct'};
+    let saved;
+    try { saved=await api('/routers',{method:'POST',body:JSON.stringify(body)}); }
+    catch(err){
+      if(onboarding.mode!=='direct') throw err;
+      out.innerHTML=`<div class="onboarding-result error"><strong>Direct connection could not be established.</strong><p>${escapeHtml(err.message)}</p><p>That does not mean the router cannot be managed. Go back and choose Cloud Agent (RouterOS 7 + outbound HTTPS) or LAN Connector.</p></div>`;
+      $('onboarding-next').classList.add('hidden'); $('onboarding-back').classList.remove('hidden'); return;
+    }
+    const router=saved.router; onboarding.router=router;
+    if(onboarding.mode==='agent'){
+      const agent=await api(`/routers/${router.id}/agent`,{method:'POST'});
+      const script=`# WiFi Voucher Cloud Agent\n# Paste this script into MikroTik RouterOS 7 terminal\n:local server "${location.origin}"\n:local token "${agent.token}"\n:local pollUrl (\$server . "/agent/poll")\n:local resultUrl (\$server . "/agent/result")\n# Use the full production agent script from the dashboard/download instructions.\n:put ("WiFi Voucher agent bootstrap ready. Token: " . \$token)\n:put ("Poll endpoint: " . \$pollUrl)\n`;
+      out.innerHTML=`<div class="onboarding-result"><strong>Router saved. Cloud Agent is ready.</strong><p>On RouterOS 7, open Terminal and use the provided agent script. Keep the token private.</p><textarea id="onboarding-agent-script" class="code-block" rows="8" readonly></textarea><button type="button" class="btn small" id="copy-onboarding-script">Copy bootstrap</button><div class="onboarding-callout"><strong>Next:</strong> After the script is installed, this router should appear online. If RouterOS cannot run the agent, return here and switch to LAN Connector or Direct API.</div></div>`;
+      $('onboarding-agent-script').value=script; $('copy-onboarding-script').onclick=()=>navigator.clipboard?.writeText(script);
+    } else if(onboarding.mode==='connector'){
+      const c=await api(`/routers/${router.id}/connector`,{method:'POST'});
+      out.innerHTML=`<div class="onboarding-result"><strong>Router saved. LAN Connector is ready.</strong><p>Install the connector on an always-on computer on the same LAN as the MikroTik.</p><label>One-time connector token</label><input value="${escapeHtml(c.token)}" readonly /><div class="code-block">WIFI_VOUCHER_URL=${location.origin}\nCONNECTOR_TOKEN=${c.token}\nROUTER_HOST=${escapeHtml(d.host)}\nROUTER_PORT=${d.port}\nROUTER_TLS=true\nROUTER_USERNAME=${escapeHtml(d.user)}\nROUTER_PASSWORD=YOUR_ROUTER_PASSWORD</div><div class="onboarding-callout"><strong>Security:</strong> Keep the token and router password private. Use RouterOS API-SSL when available.</div></div>`;
+    } else {
+      out.innerHTML=`<div class="onboarding-result"><strong>Router connected successfully.</strong><p>Direct API is active. We’ll use it whenever the router is reachable.</p><div class="onboarding-checks"><div>✓ Router saved</div><div>✓ Connection tested</div><div>✓ Voucher management ready</div></div></div>`;
+    }
+    localStorage.setItem('wv_onboarding_complete','1'); $('onboarding-next').textContent='Done'; $('onboarding-next').classList.remove('hidden'); $('onboarding-back').classList.add('hidden'); $('onboarding-skip').classList.add('hidden'); await loadRouters(); await loadProfiles(); updatePrerequisiteHints();
+  } catch(err){ out.innerHTML=`<div class="onboarding-result error"><strong>Setup needs one more step.</strong><p>${escapeHtml(err.message)}</p><p>Use Back to review the connection choice, then try again.</p></div>`; }
+}
+
