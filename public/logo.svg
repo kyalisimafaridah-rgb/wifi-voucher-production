@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+<title id="title">WiFi Voucher</title><desc id="desc">Emerald WiFi Voucher brand mark</desc>
+<defs><linearGradient id="g" x1="12" y1="8" x2="116" y2="120" gradientUnits="userSpaceOnUse"><stop stop-color="#10b981"/><stop offset="1" stop-color="#047857"/></linearGradient></defs>
+<rect x="4" y="4" width="120" height="120" rx="30" fill="#071b15"/>
+<rect x="10" y="10" width="108" height="108" rx="26" fill="url(#g)"/>
+<path d="M29 51.5C45.2 35.3 82.8 35.3 99 51.5" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round"/>
+<path d="M40 64.5C50.5 54.1 77.5 54.1 88 64.5" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round"/>
+<circle cx="64" cy="82.5" r="6.5" fill="#fff"/>
+<path d="M22 98h84" stroke="#d1fae5" stroke-width="5" stroke-linecap="round" opacity=".65"/>
+</svg>
