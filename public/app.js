@@ -308,6 +308,9 @@ async function showOwnerDashboard(owner) {
   } catch (err) {
     handleDashboardLoadError(err, 'routers-list', 'routers');
   }
+  if (!routersCache.length && !localStorage.getItem('wv_onboarding_skipped') && !localStorage.getItem('wv_onboarding_complete')) {
+    setTimeout(() => openOnboarding(), 250);
+  }
   try {
     await loadProfiles();
   } catch (err) {
