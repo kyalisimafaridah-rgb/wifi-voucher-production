@@ -51,7 +51,10 @@ export async function registerConnectorSocket(device, socket) {
   socket.on('message', async (raw) => {
     let message;
     try { message = JSON.parse(raw.toString()); } catch { return; }
-    if (message.type === 'hello') return;
+    if (message.type === 'hello' || message.type === 'heartbeat') {
+      await supabase.from('connector_devices').update({ status: 'online', last_seen_at: new Date().toISOString() }).eq('id', device.id);
+      return;
+    }
 
     if (message.type === 'result' && message.requestId) {
       const waiter = pending.get(message.requestId);
