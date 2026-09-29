@@ -7,7 +7,7 @@ const missing = required.filter((key) => !process.env[key]);
 if (missing.length) { console.error('Missing connector settings:', missing.join(', ')); process.exit(1); }
 
 const baseUrl = process.env.WIFI_VOUCHER_URL.replace(/\/$/, '');
-const wsUrl = baseUrl.replace(/^http/, 'ws') + '/connector/ws?token=' + encodeURIComponent(process.env.CONNECTOR_TOKEN);
+const wsUrl = baseUrl.replace(/^http/, 'ws') + '/connector/ws';
 const router = {
   host: process.env.ROUTER_HOST,
   port: Number(process.env.ROUTER_PORT || (process.env.ROUTER_TLS === 'true' ? 8729 : 8728)),
@@ -22,7 +22,7 @@ let stopping = false;
 function connect() {
   if (stopping) return;
   console.log('Connecting to WiFi Voucher cloud...');
-  const ws = new WebSocket(wsUrl, { handshakeTimeout: 15000 });
+  const ws = new WebSocket(wsUrl, { handshakeTimeout: 15000, headers: { Authorization: 'Bearer ' + process.env.CONNECTOR_TOKEN } });
   ws.on('open', () => { reconnectDelay = 1000; console.log('✓ Connected to WiFi Voucher cloud'); ws.send(JSON.stringify({ type: 'hello', version: '1.0.0' })); });
   ws.on('message', async (raw) => {
     let message; try { message = JSON.parse(raw.toString()); } catch { return; }
