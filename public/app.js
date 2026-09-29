@@ -471,21 +471,97 @@ async function loadRouters() {
   for (const r of routersCache) {
     const div = document.createElement('div');
     div.className = 'list-item';
-    const lastSeen = r.last_connected_at
-      ? new Date(r.last_connected_at).toLocaleString()
-      : 'Never';
+    const lastSeen = r.last_connected_at ? new Date(r.last_connected_at).toLocaleString() : 'Never';
+    const connector = Array.isArray(r.connector_devices) ? r.connector_devices[0] : r.connector_devices;
+    const remote = r.connection_mode === 'connector';
+    const remoteStatus = connector?.status === 'online' ? '🟢 Remote online' : '⚪ Remote offline';
+    const endpoint = remote ? remoteStatus : (r.status || 'unknown');
     div.innerHTML = `
       <div>
-        <strong><span class="status-dot ${r.status}"></span>${escapeHtml(r.label)}</strong>
-        <div class="meta">${escapeHtml(r.host)}:${r.api_port} · ${r.status} · Last seen: ${lastSeen}</div>
+        <strong><span class="status-dot ${remote && connector?.status === 'online' ? 'connected' : r.status}"></span>${escapeHtml(r.label)}</strong>
+        <div class="meta">${remote ? 'Remote Connector · ' : escapeHtml(r.host) + ':' + r.api_port + ' · '}${endpoint} · Last seen: ${lastSeen}</div>
       </div>
       <div class="actions">
         <button class="btn small" data-retest="${r.id}">Re-test</button>
+        <button class="btn small" data-connector="${r.id}">Remote Connector</button>
         <button class="btn small" data-sync-vouchers="${r.id}">Sync voucher status</button>
         <button class="btn small danger" data-del-router="${r.id}">Delete</button>
       </div>
     `;
     list.appendChild(div);
+  }
+}
+
+async function openConnectorModal(routerId) {
+  const router = routersCache.find((r) => r.id === routerId);
+  if (!router) return;
+  $('modal-connector').dataset.routerId = routerId;
+  $('connector-status').textContent = 'Loading connector status…';
+  hide($('connector-token-section'));
+  show($('modal-connector'));
+  try {
+    const res = await api(`/routers/${routerId}/connector`);
+    const connector = res.connector;
+    $('connector-status').innerHTML = connector
+      ? `<strong>${connector.status === 'online' ? '🟢 Connected' : '⚪ Offline'}</strong><div class="hint">Last seen: ${connector.last_seen_at ? new Date(connector.last_seen_at).toLocaleString() : 'Never'}</div>`
+      : '<strong>Not configured</strong><div class="hint">Generate a connector token to enable remote access.</div>';
+  } catch (err) {
+    $('connector-status').textContent = err.message;
+  }
+}
+
+function updateConnectorPreview() {
+  const token = $('connector-token').value.trim();
+  const host = $('connector-router-host').value.trim() || '192.168.88.1';
+  const user = $('connector-router-user').value.trim() || 'wifi-voucher';
+  const pass = $('connector-router-pass').value;
+  const port = $('connector-router-port').value.trim() || '8729';
+  const tls = $('connector-router-tls').checked ? 'true' : 'false';
+  $('connector-env-preview').textContent =
+`WIFI_VOUCHER_URL=https://wifi-voucher-production-v2.onrender.com
+CONNECTOR_TOKEN=${token}
+ROUTER_HOST=${host}
+ROUTER_PORT=${port}
+ROUTER_TLS=${tls}
+ROUTER_USERNAME=${user}
+ROUTER_PASSWORD=${pass}`;
+}
+
+async function createConnector() {
+  const routerId = $('modal-connector').dataset.routerId;
+  if (!routerId) return;
+  const btn = $('create-connector-btn');
+  setBtnLoading(btn, 'Generating…');
+  try {
+    const res = await api(`/routers/${routerId}/connector`, { method: 'POST' });
+    $('connector-token').value = res.token;
+    $('connector-ws-url').value = res.websocket_url;
+    $('connector-router-host').value = '';
+    $('connector-router-user').value = '';
+    $('connector-router-pass').value = '';
+    $('connector-router-port').value = '8729';
+    $('connector-router-tls').checked = true;
+    show($('connector-token-section'));
+    updateConnectorPreview();
+    showToast('Connector generated. Save the token securely.', 'success');
+    await loadRouters();
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    resetBtn(btn);
+  }
+}
+
+async function revokeConnector() {
+  const routerId = $('modal-connector').dataset.routerId;
+  if (!routerId || !confirm('Revoke remote access for this router?')) return;
+  try {
+    await api(`/routers/${routerId}/connector`, { method: 'DELETE' });
+    hide($('modal-connector'));
+    showToast('Remote connector revoked.', 'success');
+    await loadRouters();
+  } catch (err) {
+    showToast(err.message, 'error');
   }
 }
 
@@ -843,6 +919,12 @@ $('add-router-btn').addEventListener('click', () => {
   show($('modal-router'));
 });
 $('cancel-router').addEventListener('click', () => hide($('modal-router')));
+$('close-connector').addEventListener('click', () => hide($('modal-connector')));
+$('create-connector-btn').addEventListener('click', createConnector);
+$('revoke-connector-btn').addEventListener('click', revokeConnector);
+['connector-router-host','connector-router-user','connector-router-pass','connector-router-port'].forEach((id) => $(id).addEventListener('input', updateConnectorPreview));
+$('connector-router-tls').addEventListener('change', updateConnectorPreview);
+
 $('test-router-btn').addEventListener('click', testRouterCredentials);
 $('router-form').addEventListener('submit', saveRouter);
 
@@ -871,6 +953,12 @@ $('load-more-vouchers').addEventListener('click', async () => {
 
 // Delegation for dynamic buttons
 document.addEventListener('click', async (e) => {
+  const connectorBtn = e.target.closest('[data-connector]');
+  if (connectorBtn) {
+    await openConnectorModal(connectorBtn.dataset.connector);
+    return;
+  }
+
   const retest = e.target.closest('[data-retest]');
   if (retest) {
     const id = retest.dataset.retest;
