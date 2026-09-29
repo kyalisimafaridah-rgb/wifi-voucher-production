@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { encrypt, decrypt } from '../utils/encryption.js';
 import { testConnection, deleteHotspotUsers } from '../services/mikrotik.js';
+import { runAdaptiveRouterOperation } from '../services/router-agent.js';
 import { requireAuth, requireActiveSubscription } from '../middleware/auth.js';
 import { supabase } from '../db/supabase.js';
 
@@ -46,7 +47,7 @@ export default async function routerRoutes(fastify) {
       owner_id: request.user.id, label: body.label, host: body.host, api_port: body.api_port, api_tls: apiTls,
       api_username: body.api_username, api_password_encrypted: encryptedPassword,
       last_connected_at: new Date().toISOString(), status: 'connected',
-    }).select('id, label, host, api_port, api_tls, api_username, connection_mode, last_connected_at, status, created_at, connector_devices(status, last_seen_at)').single();
+    }).select('id, label, host, api_port, api_tls, api_username, connection_mode, last_connected_at, status, created_at, connector_devices(status, last_seen_at), router_agents(status, last_seen_at, routeros_version, architecture)').single();
 
     if (error) return reply.code(error.code === '23505' ? 409 : 500).send({ success: false, error: error.code === '23505' ? 'Duplicate router' : 'Failed to save router', message: error.code === '23505' ? 'This router was just added. Refresh your router list.' : error.message });
     return { success: true, message: 'Router connected and saved successfully', router: data, test: testResult };
@@ -85,7 +86,7 @@ export default async function routerRoutes(fastify) {
     let password;
     try { password = decrypt(router.api_password_encrypted); } catch { return reply.code(500).send({ error: 'Failed to decrypt credentials' }); }
     try {
-      const result = await testConnection({ host: router.host, port: router.api_port, username: router.api_username, password, secure: router.api_tls });
+      const result = await runAdaptiveRouterOperation(router, 'test');
       await supabase.from('routers').update({ status: 'connected', last_connected_at: new Date().toISOString() }).eq('id', id);
       return { success: true, message: 'Router is reachable', router: result };
     } catch (err) {
