@@ -57,3 +57,6 @@ create trigger router_agents_updated_at before update on public.router_agents
 for each row execute procedure public.set_router_agent_updated_at();
 
 alter table public.routers add column if not exists connection_mode text not null default 'direct';
+update public.routers set connection_mode='direct' where connection_mode not in ('direct','connector','agent');
+alter table public.routers drop constraint if exists routers_connection_mode_check;
+alter table public.routers add constraint routers_connection_mode_check check (connection_mode in ('direct','connector','agent'));
