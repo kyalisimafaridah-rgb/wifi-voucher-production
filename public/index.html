@@ -319,6 +319,20 @@
       </main>
     </section>
 
+    <!-- FIRST-RUN ONBOARDING WIZARD -->
+    <div id="modal-onboarding" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+      <div class="modal-card onboarding-card">
+        <div class="onboarding-progress"><span id="onboarding-step-label">Step 1 of 5</span><div class="progress-track"><i id="onboarding-progress-bar"></i></div></div>
+        <div id="onboarding-body"></div>
+        <div class="modal-actions onboarding-actions">
+          <button type="button" class="btn" id="onboarding-back">Back</button>
+          <button type="button" class="btn primary" id="onboarding-next">Continue</button>
+          <button type="button" class="btn" id="onboarding-skip">Skip for now</button>
+        </div>
+        <p id="onboarding-status" class="hint" aria-live="polite"></p>
+      </div>
+    </div>
+
     <!-- MODAL: Add Router -->
     <div id="modal-router" class="modal hidden">
       <div class="modal-card">
