@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { supabase } from '../db/supabase.js';
+import { decrypt } from '../utils/encryption.js';
 import {
   testConnection,
   createHotspotUsers,
@@ -133,4 +134,30 @@ export async function executeConnectorOperation(operation, payload) {
       throw err;
     }
   }
+}
+
+export async function runRouterOperation(router, operation, payload = {}, timeoutMs = 30000) {
+  if (router.connection_mode === 'connector') {
+    const { data: device, error } = await supabase
+      .from('connector_devices')
+      .select('id, status')
+      .eq('router_id', router.id)
+      .maybeSingle();
+    if (error || !device) {
+      const err = new Error('Remote connector is not configured for this router.');
+      err.code = 'CONNECTOR_NOT_CONFIGURED';
+      throw err;
+    }
+    return sendConnectorCommand(device.id, operation, payload, timeoutMs);
+  }
+
+  const password = decrypt(router.api_password_encrypted);
+  return executeConnectorOperation(operation, {
+    ...payload,
+    host: router.host,
+    port: router.api_port,
+    username: router.api_username,
+    password,
+    secure: router.api_tls,
+  });
 }
