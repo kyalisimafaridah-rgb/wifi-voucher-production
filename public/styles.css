@@ -632,7 +632,7 @@ a { color: inherit; }
 }
 
 
-.onboarding-card { width:min(680px,calc(100% - 1rem)); max-height:90vh; overflow:auto; }
+.onboarding-card { width:min(680px,calc(100% - 1rem)); max-height:calc(100dvh - 1.25rem); overflow:auto; overscroll-behavior:contain; }
 .onboarding-progress { display:flex; align-items:center; gap:.8rem; margin-bottom:1.2rem; color:var(--muted); font-size:.75rem; }
 .progress-track { flex:1; height:6px; background:#102c22; border-radius:99px; overflow:hidden; }
 .progress-track i { display:block; height:100%; width:20%; background:#34d399; transition:width .2s ease; }
@@ -652,3 +652,16 @@ a { color: inherit; }
 .onboarding-result input,.onboarding-result textarea { width:100%; margin-top:.5rem; }
 .onboarding-actions { margin-top:1.25rem; }
 @media (max-width:640px){ .onboarding-checks{grid-template-columns:1fr;} .onboarding-actions{flex-wrap:wrap;} .onboarding-actions #onboarding-next{margin-left:auto;} }
+
+
+.onboarding-hero p { max-width:58ch; }
+.onboarding-callout { line-height:1.55; }
+.onboarding-result strong { color:#dff8ee; }
+@media (max-width:640px) {
+  .onboarding-card { width:calc(100% - .75rem); max-height:calc(100dvh - .75rem); padding:1rem; border-radius:18px; }
+  .onboarding-card h2 { font-size:1.55rem; line-height:1.2; }
+  .onboarding-checks div { padding:.75rem; font-size:.84rem; }
+  .onboarding-actions { position:sticky; bottom:0; background:linear-gradient(180deg,rgba(10,31,24,.2),#0a2119 28%); padding-top:.8rem; }
+  .onboarding-actions .btn { min-height:48px; }
+  .code-block { font-size:.72rem; max-height:38vh; }
+}
