@@ -6,6 +6,7 @@ import websocket from '@fastify/websocket';
 import fastifyStatic from '@fastify/static';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { readFile } from 'fs/promises';
 import dotenv from 'dotenv';
 
 import routerRoutes from './routes/routers.js';
