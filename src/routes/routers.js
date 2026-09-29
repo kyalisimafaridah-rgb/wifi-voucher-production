@@ -7,12 +7,18 @@ import { supabase } from '../db/supabase.js';
 
 const addRouterSchema = z.object({
   label: z.string().min(1).max(100),
-  host: z.string().min(1).max(255),
+  host: z.string().max(255).optional().nullable(),
   api_port: z.number().int().min(1).max(65535).default(8729),
   api_tls: z.boolean().optional(),
-  api_username: z.string().min(1).max(100),
-  api_password: z.string().min(1).max(200),
+  api_username: z.string().max(100).optional().nullable(),
+  api_password: z.string().max(200).optional().nullable(),
   connection_mode: z.enum(['direct','agent']).optional().default('direct'),
+}).superRefine((body, ctx) => {
+  if (body.connection_mode === 'direct') {
+    if (!body.host) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['host'], message: 'Router address is required for direct connection.' });
+    if (!body.api_username) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['api_username'], message: 'Router username is required for direct connection.' });
+    if (!body.api_password) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['api_password'], message: 'Router password is required for direct connection.' });
+  }
 });
 
 export default async function routerRoutes(fastify) {
@@ -33,7 +39,10 @@ export default async function routerRoutes(fastify) {
   fastify.post('/routers', async (request, reply) => {
     const body = addRouterSchema.parse(request.body);
     const apiTls = body.api_tls ?? body.api_port === 8729;
-    const { data: existing } = await request.supabase.from('routers').select('id, label').eq('owner_id', request.user.id).eq('host', body.host).eq('api_port', body.api_port).maybeSingle();
+    const routerHost = body.host || null;
+    const { data: existing } = routerHost
+      ? await request.supabase.from('routers').select('id, label').eq('owner_id', request.user.id).eq('host', routerHost).eq('api_port', body.api_port).maybeSingle()
+      : { data: null };
     if (existing) return reply.code(409).send({ success: false, error: 'Duplicate router', message: `You already have a router saved for ${body.host}:${body.api_port} (labeled "${existing.label}"). Delete it first if you want to re-add it.` });
 
     let testResult = null;
@@ -44,10 +53,10 @@ export default async function routerRoutes(fastify) {
         return reply.code(400).send({ success: false, error: 'Cannot save router — connection test failed', message: err.message, hint: 'Choose Cloud Agent mode if the router is behind CGNAT or has no inbound route.' });
       }
     }
-    const encryptedPassword = encrypt(body.api_password);
+    const encryptedPassword = body.api_password ? encrypt(body.api_password) : null;
     const { data, error } = await request.supabase.from('routers').insert({
-      owner_id: request.user.id, label: body.label, host: body.host, api_port: body.api_port, api_tls: apiTls,
-      api_username: body.api_username, api_password_encrypted: encryptedPassword,
+      owner_id: request.user.id, label: body.label, host: routerHost, api_port: body.api_port, api_tls: apiTls,
+      api_username: body.api_username || null, api_password_encrypted: encryptedPassword,
       last_connected_at: testResult ? new Date().toISOString() : null, status: testResult ? 'connected' : 'unknown', connection_mode: body.connection_mode === 'agent' ? 'agent' : 'direct',
     }).select('id, label, host, api_port, api_tls, api_username, connection_mode, last_connected_at, status, created_at, connector_devices(status, last_seen_at), router_agents(status, last_seen_at, routeros_version, architecture)').single();
 
