@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import crypto from 'crypto';
 import { requireAuth, requireActiveSubscription } from '../middleware/auth.js';
-import { runRouterOperation } from '../services/connector.js';
+import { runAdaptiveRouterOperation } from '../services/router-agent.js';
 import {
   minutesToUptime,
   mbToBytes,
@@ -120,7 +120,7 @@ export default async function voucherRoutes(fastify) {
     // 3. Verify the router path. Connector mode checks the outbound connector;
     // direct mode checks RouterOS directly.
     try {
-      await runRouterOperation(router, 'test');
+      await runAdaptiveRouterOperation(router, 'test');
     } catch (err) {
       await request.supabase.from('voucher_generation_logs').insert({
         owner_id: ownerId,
@@ -157,7 +157,7 @@ export default async function voucherRoutes(fastify) {
     // 6. Create on the router FIRST
     let createResult;
     try {
-      createResult = await runRouterOperation(router, 'create_users', { users: mikrotikUsers }, 30000);
+      createResult = await runAdaptiveRouterOperation(router, 'create_users', { users: mikrotikUsers }, 30000);
     } catch (err) {
       await request.supabase.from('voucher_generation_logs').insert({
         owner_id: ownerId,
@@ -280,7 +280,7 @@ export default async function voucherRoutes(fastify) {
 
     let usage;
     try {
-      usage = await runRouterOperation(router, 'usage', {
+      usage = await runAdaptiveRouterOperation(router, 'usage', {
         codes: vouchers.map((v) => v.code),
       }, 20000);
 ;
