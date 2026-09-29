@@ -914,6 +914,19 @@ document.querySelectorAll('.nav-btn').forEach((btn) => {
 });
 
 $('add-router-btn').addEventListener('click', () => {
+  openOnboarding();
+});
+$('onboarding-next').addEventListener('click', async () => {
+  if (onboarding.step === onboarding.total) { closeOnboarding(); return; }
+  await nextOnboarding();
+});
+$('onboarding-back').addEventListener('click', () => {
+  if (onboarding.step > 1) { onboarding.step--; renderOnboarding(); }
+});
+$('onboarding-skip').addEventListener('click', () => closeOnboarding(true));
+$('router-form').addEventListener('submit', saveRouter);
+
+$('legacy-add-router-btn-disabled').addEventListener('click', () => {
   $('router-form').reset();
   $('router-test-result').textContent = '';
   show($('modal-router'));
