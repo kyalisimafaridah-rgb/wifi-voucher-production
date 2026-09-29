@@ -43,6 +43,7 @@ export default async function routerRoutes(fastify) {
       } catch (err) {
         return reply.code(400).send({ success: false, error: 'Cannot save router — connection test failed', message: err.message, hint: 'Choose Cloud Agent mode if the router is behind CGNAT or has no inbound route.' });
       }
+    }
     const encryptedPassword = encrypt(body.api_password);
     const { data, error } = await request.supabase.from('routers').insert({
       owner_id: request.user.id, label: body.label, host: body.host, api_port: body.api_port, api_tls: apiTls,
