@@ -926,11 +926,6 @@ $('onboarding-back').addEventListener('click', () => {
 $('onboarding-skip').addEventListener('click', () => closeOnboarding(true));
 $('router-form').addEventListener('submit', saveRouter);
 
-$('legacy-add-router-btn-disabled').addEventListener('click', () => {
-  $('router-form').reset();
-  $('router-test-result').textContent = '';
-  show($('modal-router'));
-});
 $('cancel-router').addEventListener('click', () => hide($('modal-router')));
 $('close-connector').addEventListener('click', () => hide($('modal-connector')));
 $('create-connector-btn').addEventListener('click', createConnector);
@@ -939,7 +934,6 @@ $('revoke-connector-btn').addEventListener('click', revokeConnector);
 $('connector-router-tls').addEventListener('change', updateConnectorPreview);
 
 $('test-router-btn').addEventListener('click', testRouterCredentials);
-$('router-form').addEventListener('submit', saveRouter);
 
 $('add-profile-btn').addEventListener('click', () => {
   if ($('add-profile-btn').disabled) return;
