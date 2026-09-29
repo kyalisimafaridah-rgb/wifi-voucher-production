@@ -162,36 +162,38 @@ async function handleSignup(e) {
 
   setBtnLoading(btn, 'Creating account…');
   try {
-    // Account creation goes through our backend (POST /auth/signup), which
-    // creates the user pre-confirmed via the service-role key — this skips
-    // Supabase's email confirmation step entirely rather than relying on
-    // the dashboard "Confirm email" toggle. Signing in is then a normal
-    // client-side call, same as the login form uses.
-    try {
-      await api('/auth/signup', {
-        method: 'POST',
-        body: JSON.stringify({ email, password, full_name: full_name || undefined }),
-      });
-    } catch (err) {
-      if (err.status === 409) {
-        setError('auth-error', 'This email is already registered — try logging in instead.');
-        return;
-      }
-      setError('auth-error', err.data?.message || err.message || 'Signup failed');
+    if (!email || !password) {
+      setError('auth-error', 'Please enter your email and password.');
       return;
     }
 
+    const created = await api('/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, full_name: full_name || undefined }),
+    });
+
+    if (!created?.success) {
+      throw new Error('The account could not be created. Please try again.');
+    }
+
     const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-    if (error) {
-      setError('auth-error', error.message);
-      return;
+    if (error || !data?.session) {
+      throw new Error(error?.message || 'Account created, but automatic login failed. Please use the Login tab.');
     }
 
     accessToken = data.session.access_token;
     if (full_name) {
-      try { await api('/me', { method: 'PATCH', body: JSON.stringify({ full_name }) }); } catch {}
+      try {
+        await api('/me', { method: 'PATCH', body: JSON.stringify({ full_name }) });
+      } catch {}
     }
     await enterDashboard();
+  } catch (err) {
+    if (err.status === 409) {
+      setError('auth-error', 'This email is already registered — try logging in instead.');
+    } else {
+      setError('auth-error', err.data?.message || err.message || 'Signup failed. Please try again.');
+    }
   } finally {
     resetBtn(btn);
   }
