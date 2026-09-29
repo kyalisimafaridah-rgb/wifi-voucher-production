@@ -24,10 +24,10 @@ create table public.routers (
   id uuid primary key default uuid_generate_v4(),
   owner_id uuid not null references public.owners(id) on delete cascade,
   label text not null,
-  host text not null,                    -- IP or DDNS hostname
+  host text,                              -- optional for Cloud Agent-managed routers
   api_port integer not null default 8728,
-  api_username text not null,
-  api_password_encrypted text not null,  -- AES-256-GCM encrypted
+  api_username text,                      -- optional for Cloud Agent-managed routers
+  api_password_encrypted text,            -- optional; AES-256-GCM encrypted
   last_connected_at timestamptz,
   status text not null default 'unknown' check (status in ('connected', 'unreachable', 'unknown')),
   created_at timestamptz not null default now(),
