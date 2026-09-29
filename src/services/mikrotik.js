@@ -156,3 +156,22 @@ export function mbToBytes(mb) {
   if (!mb || mb <= 0) return null;
   return Math.floor(mb * 1024 * 1024);
 }
+
+export async function executeConnectorOperation(operation, payload) {
+  const { host, port, username, password, secure = false } = payload;
+  switch (operation) {
+    case 'test':
+      return testConnection({ host, port, username, password, secure });
+    case 'create_users':
+      return createHotspotUsers({ host, port, username, password, users: payload.users || [], secure });
+    case 'delete_users':
+      return deleteHotspotUsers({ host, port, username, password, names: payload.names || [], secure });
+    case 'usage':
+      return getHotspotUserUsage({ host, port, username, password, codes: payload.codes || [], secure });
+    default: {
+      const error = new Error('Unsupported router operation');
+      error.code = 'UNSUPPORTED_ROUTER_OPERATION';
+      throw error;
+    }
+  }
+}
