@@ -617,3 +617,16 @@ a { color: inherit; }
   html { scroll-behavior:auto; }
   .feature-card:hover { transform:none; }
 }
+
+
+.code-block {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #071a14;
+  color: #d8f7e9;
+  border: 1px solid rgba(20,184,120,.22);
+  border-radius: 12px;
+  padding: .9rem;
+  font: .82rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-x: auto;
+}
