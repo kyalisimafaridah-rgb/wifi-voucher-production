@@ -51,7 +51,7 @@ async function processInboundMomoSms(rawBody, network, storage) {
         return { status: "duplicate", existingEventId: reservation.existingEventId };
     }
     const { eventId } = reservation;
-    const candidates = await storage.findPendingPaymentsByAmount(parsed.amountUgx);
+    const candidates = await storage.findPendingPaymentsByAmount(parsed.amountUgx, network);
     const matching = candidates.filter((p) => (0, parser_1.reasonMentionsReference)(parsed.reasonName, p.referenceText));
     if (matching.length === 0) {
         await storage.updateEventStatus(eventId, {
