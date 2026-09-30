@@ -16,10 +16,10 @@
   function el(id) { return document.getElementById(id); }
 
   async function get(path) {
-    return window.api ? window.api(path) : Promise.reject(new Error('Admin API is not ready. Refresh the page.'));
+    return window.__wvApi ? window.__wvApi(path) : Promise.reject(new Error('Admin API is not ready. Refresh the page.'));
   }
   async function send(path, options) {
-    return window.api ? window.api(path, options) : Promise.reject(new Error('Admin API is not ready. Refresh the page.'));
+    return window.__wvApi ? window.__wvApi(path, options) : Promise.reject(new Error('Admin API is not ready. Refresh the page.'));
   }
 
   function showError(err) {
