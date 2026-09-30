@@ -49,6 +49,9 @@ async function api(path, options = {}) {
   return data;
 }
 
+// Expose the authenticated API wrapper to the admin console loaded after this file.
+window.__wvApi = api;
+
 function show(el) { el.classList.remove('hidden'); }
 function hide(el) { el.classList.add('hidden'); }
 function $(id) { return document.getElementById(id); }
