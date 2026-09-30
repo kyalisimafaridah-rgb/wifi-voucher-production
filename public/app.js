@@ -284,6 +284,111 @@ function isSubscriptionExpired(owner) {
   return false;
 }
 
+let paymentPollTimer = null;
+let paymentPollAttempts = 0;
+
+function renderPaymentInstructions(instructions, payment) {
+  const box = $('payment-instructions');
+  if (!box) return;
+  box.classList.remove('hidden');
+  box.innerHTML = `
+    <strong>Payment started</strong>
+    <div>Send <b>${escapeHtml(Number(instructions.amount_ugx || payment.amount_ugx).toLocaleString())} UGX</b> to <b>${escapeHtml(instructions.merchant_number || 'the configured merchant number')}</b>.</div>
+    <div class="hint" style="margin-top:.5rem">Reference: <span class="payment-reference">${escapeHtml(instructions.reference || payment.merchant_reference)}</span></div>
+    <div class="hint" style="margin-top:.5rem">We will verify the payment before restoring access. You do not need to mark yourself as paid.</div>`;
+}
+
+function stopPaymentPolling() {
+  if (paymentPollTimer) clearInterval(paymentPollTimer);
+  paymentPollTimer = null;
+  paymentPollAttempts = 0;
+}
+
+async function pollPayment(id) {
+  if (!id) return;
+  try {
+    const res = await api('/billing/payment-intents/' + encodeURIComponent(id));
+    const payment = res.payment;
+    const status = $('payment-status');
+    if (status) status.textContent = payment.status === 'succeeded'
+      ? 'Payment verified. Restoring your account…'
+      : payment.status === 'failed'
+        ? 'The payment failed. You can start another payment.'
+        : 'Waiting for payment verification…';
+    if (payment.status === 'succeeded') {
+      stopPaymentPolling();
+      await enterDashboard();
+      return;
+    }
+    if (['failed','expired','cancelled','refunded','disputed'].includes(payment.status)) stopPaymentPolling();
+  } catch (err) {
+    if ($('payment-status')) $('payment-status').textContent = 'Still checking your payment…';
+  }
+  paymentPollAttempts += 1;
+  if (paymentPollAttempts >= 120) {
+    stopPaymentPolling();
+    if ($('payment-status')) $('payment-status').textContent = 'We stopped automatic checking after 10 minutes. Your payment can still be matched; log in again later to check.';
+  }
+}
+
+function startPaymentPolling(id) {
+  stopPaymentPolling();
+  paymentPollAttempts = 0;
+  pollPayment(id);
+  paymentPollTimer = setInterval(() => pollPayment(id), 5000);
+}
+
+async function startPayment(provider) {
+  const optionsEl = $('payment-options');
+  const status = $('payment-status');
+  try {
+    optionsEl?.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+    if (status) status.textContent = 'Creating a secure payment record…';
+    const phone = window.prompt('Mobile Money number (optional):') || '';
+    const key = (window.crypto?.randomUUID ? window.crypto.randomUUID() : 'wv-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+    const res = await api('/billing/payment-intents', {
+      method: 'POST',
+      body: JSON.stringify({ provider, payer_phone: phone.trim() || null, idempotency_key: key }),
+    });
+    renderPaymentInstructions(res.instructions, res.payment);
+    if (status) status.textContent = 'Waiting for payment verification…';
+    startPaymentPolling(res.payment.id);
+  } catch (err) {
+    if (status) status.textContent = err.message || 'Could not start payment.';
+    optionsEl?.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+  }
+}
+
+async function loadPaymentOptions() {
+  const optionsEl = $('payment-options');
+  const amountEl = $('payment-amount');
+  const status = $('payment-status');
+  if (!optionsEl) return;
+  try {
+    const res = await api('/billing/payment-options');
+    if (amountEl) amountEl.textContent = Number(res.amount_ugx || 0).toLocaleString() + ' UGX / 30 days';
+    optionsEl.innerHTML = (res.options || []).map((option) => `
+      <button type="button" class="btn payment-option" data-payment-provider="${escapeHtml(option.provider)}" ${option.configured ? '' : 'disabled'}>
+        <b>${escapeHtml(option.provider.toUpperCase())} Mobile Money</b>
+        <small>${option.configured ? 'Pay using the merchant account' : 'Not configured yet'}</small>
+      </button>`).join('');
+    if (!res.options?.some((x) => x.configured) && status) status.textContent = 'Mobile Money checkout is not configured yet. The app owner must add a merchant account first.';
+  } catch (err) {
+    optionsEl.innerHTML = '<p class="hint">Payment options could not be loaded. Please try again.</p>';
+    if (status) status.textContent = err.message || 'Could not load payment options.';
+  }
+}
+
+function bindPaymentCheckout() {
+  const optionsEl = $('payment-options');
+  if (!optionsEl || optionsEl.dataset.bound) return;
+  optionsEl.dataset.bound = '1';
+  optionsEl.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-payment-provider]');
+    if (btn) startPayment(btn.dataset.paymentProvider);
+  });
+}
+
 function renderTrialBanner(owner) {
   const el = $('trial-banner');
   el.innerHTML = '';
@@ -323,6 +428,8 @@ async function enterDashboard() {
 
   if (isSubscriptionExpired(owner)) {
     show($('expired-screen'));
+    bindPaymentCheckout();
+    loadPaymentOptions();
     return;
   }
 
@@ -962,6 +1069,7 @@ $('forgot-form').addEventListener('submit', handleForgotPassword);
 $('recovery-form').addEventListener('submit', handleRecoverySubmit);
 $('logout-btn').addEventListener('click', logout);
 $('expired-logout-btn').addEventListener('click', logout);
+bindPaymentCheckout();
 $('admin-logout-btn').addEventListener('click', logout);
 
 $('admin-panel-btn').addEventListener('click', showAdminScreen);
