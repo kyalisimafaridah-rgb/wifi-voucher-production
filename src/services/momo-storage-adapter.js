@@ -9,18 +9,36 @@ export const momoStorageAdapter = {
   async findPendingPaymentsByAmount(amountUgx) {
     if (!SUBSCRIPTION_PRICE_UGX || amountUgx !== SUBSCRIPTION_PRICE_UGX) return [];
 
-    const { data, error } = await supabase
+    const now = new Date().toISOString();
+    const { data: intents, error: intentError } = await supabase
+      .from('payment_intents')
+      .select('id, owner_id, amount_ugx')
+      .eq('provider', arguments[0]?.network || '')
+      .eq('amount_ugx', amountUgx)
+      .in('status', ['created', 'pending', 'processing'])
+      .gt('expires_at', now);
+
+    if (intentError) throw new Error(`findPendingPaymentsByAmount failed: ${intentError.message}`);
+    if (!intents?.length) return [];
+
+    const ownerIds = [...new Set(intents.map((intent) => intent.owner_id))];
+    const { data: owners, error: ownerError } = await supabase
       .from('owners')
       .select('id, momo_registered_name')
+      .in('id', ownerIds)
       .not('momo_registered_name', 'is', null);
 
-    if (error) throw new Error(`findPendingPaymentsByAmount failed: ${error.message}`);
+    if (ownerError) throw new Error(`findPendingPaymentsByAmount owner lookup failed: ${ownerError.message}`);
 
-    return (data || []).map((owner) => ({
-      id: owner.id,
-      amountUgx: SUBSCRIPTION_PRICE_UGX,
-      referenceText: owner.momo_registered_name,
-    }));
+    const names = new Map((owners || []).map((owner) => [owner.id, owner.momo_registered_name]));
+    return intents
+      .filter((intent) => names.has(intent.owner_id))
+      .map((intent) => ({
+        id: intent.owner_id,
+        paymentIntentId: intent.id,
+        amountUgx: intent.amount_ugx,
+        referenceText: names.get(intent.owner_id),
+      }));
   },
 
   async reserveEvent(params) {
