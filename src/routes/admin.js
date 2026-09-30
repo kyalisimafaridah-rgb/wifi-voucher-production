@@ -131,13 +131,34 @@ export default async function adminRoutes(fastify) {
   fastify.get('/admin/payments', adminRateLimit, async (request) => {
     const limit = Math.min(Math.max(Number(request.query?.limit) || 100, 1), 200);
     const status = String(request.query?.status || '').trim();
-    let query = supabase.from('momo_events')
-      .select('id,transaction_id,network,parsed_amount_ugx,parsed_reason_name,parsed_reason_phone,status,matched_owner_id,note,created_at,owners(email,full_name)')
-      .order('created_at', { ascending: false }).limit(limit);
-    if (status) query = query.eq('status', status);
-    const { data, error } = await query;
-    if (error) throw error;
-    return { payments: data || [] };
+    const intentStatuses = ['created', 'pending', 'processing', 'succeeded', 'failed', 'expired', 'refunded', 'disputed', 'cancelled'];
+    const [eventsQ, intentsQ] = await Promise.all([
+      supabase.from('momo_events')
+        .select('id,transaction_id,network,parsed_amount_ugx,parsed_reason_name,parsed_reason_phone,status,matched_owner_id,note,created_at,owners(email,full_name)')
+        .order('created_at', { ascending: false }).limit(limit),
+      supabase.from('payment_intents')
+        .select('id,merchant_reference,provider,amount_ugx,payer_phone,status,provider_transaction_id,created_at,confirmed_at,owner_id,owners(email,full_name)')
+        .order('created_at', { ascending: false }).limit(limit),
+    ]);
+    if (eventsQ.error) throw eventsQ.error;
+    if (intentsQ.error) throw intentsQ.error;
+
+    const events = (eventsQ.data || []).map((p) => ({
+      ...p, source: 'momo_event', amount: p.parsed_amount_ugx, reference: p.transaction_id || p.parsed_reason_name,
+    }));
+    const intents = (intentsQ.data || []).map((p) => ({
+      ...p, source: 'payment_intent', network: p.provider, parsed_amount_ugx: p.amount_ugx,
+      parsed_reason_name: p.merchant_reference, transaction_id: p.provider_transaction_id,
+      matched_owner_id: p.owner_id, note: p.payer_phone ? 'Payer: ' + p.payer_phone : null,
+      created_at: p.created_at, amount: p.amount_ugx, reference: p.merchant_reference,
+    }));
+
+    let payments;
+    if (intentStatuses.includes(status)) payments = intents.filter((p) => p.status === status);
+    else if (status) payments = events.filter((p) => p.status === status);
+    else payments = [...events, ...intents].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, limit);
+
+    return { payments, intents, events };
   });
 
   fastify.get('/admin/health', adminRateLimit, async () => {
