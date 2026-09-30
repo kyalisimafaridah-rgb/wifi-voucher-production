@@ -185,7 +185,16 @@
     <section id="expired-screen" class="screen hidden">
       <div class="card state-card">
         <h1>Your trial has ended</h1>
-        <p id="expired-message">Your 14-day trial has expired. Contact the app owner to activate your subscription and regain access to your routers, profiles, and vouchers.</p>
+        <p id="expired-message">Your 14-day trial has expired. Choose Mobile Money below. Your access is restored only after the payment is verified.</p>
+        <div id="payment-checkout" class="payment-checkout">
+          <div class="payment-summary">
+            <strong>Activate your subscription</strong>
+            <span id="payment-amount" class="hint">Loading price…</span>
+          </div>
+          <div id="payment-options" class="payment-options"><p class="hint">Loading payment options…</p></div>
+          <div id="payment-instructions" class="payment-instructions hidden"></div>
+          <p id="payment-status" class="hint" aria-live="polite"></p>
+        </div>
         <p class="hint">Your data is safe and will be available again once your subscription is active.</p>
         <button id="expired-logout-btn" class="btn">Log out</button>
       </div>
