@@ -294,7 +294,7 @@ function renderPaymentInstructions(instructions, payment) {
   box.innerHTML = `
     <strong>Payment started</strong>
     <div>Send <b>${escapeHtml(Number(instructions.amount_ugx || payment.amount_ugx).toLocaleString())} UGX</b> to <b>${escapeHtml(instructions.merchant_number || 'the configured merchant number')}</b>.</div>
-    <div class="hint" style="margin-top:.5rem">Reference: <span class="payment-reference">${escapeHtml(instructions.reference || payment.merchant_reference)}</span></div>
+    <div class="hint" style="margin-top:.5rem">Send the payment from the Mobile Money account whose registered name you saved in your account settings.</div>
     <div class="hint" style="margin-top:.5rem">We will verify the payment before restoring access. Keep the payment confirmation SMS until your payment is verified.</div>`;
 }
 
