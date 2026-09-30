@@ -127,3 +127,8 @@ $$;
 revoke all on function public.confirm_payment_intent(uuid,text,integer) from public, anon, authenticated;
 revoke all on function public.confirm_payment_intent(uuid,text,integer,text,text,text,boolean,jsonb,integer) from public, anon, authenticated;
 grant execute on function public.confirm_payment_intent(uuid,text,integer,text,text,text,boolean,jsonb,integer) to service_role;
+
+-- Remove the legacy callable signature so no older backend path can invoke
+-- confirmation without provider/amount validation.
+revoke all on function public.confirm_payment_intent(uuid,text,integer) from public, anon, authenticated, service_role;
+drop function if exists public.confirm_payment_intent(uuid,text,integer);
