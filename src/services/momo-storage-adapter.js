@@ -6,14 +6,14 @@ const SUBSCRIPTION_PRICE_UGX = Number(process.env.SUBSCRIPTION_PRICE_UGX || 0);
 const POSTGRES_UNIQUE_VIOLATION = '23505';
 
 export const momoStorageAdapter = {
-  async findPendingPaymentsByAmount(amountUgx) {
+  async findPendingPaymentsByAmount(amountUgx, network) {
     if (!SUBSCRIPTION_PRICE_UGX || amountUgx !== SUBSCRIPTION_PRICE_UGX) return [];
 
     const now = new Date().toISOString();
     const { data: intents, error: intentError } = await supabase
       .from('payment_intents')
       .select('id, owner_id, amount_ugx')
-      .eq('provider', arguments[0]?.network || '')
+      .eq('provider', network)
       .eq('amount_ugx', amountUgx)
       .in('status', ['created', 'pending', 'processing'])
       .gt('expires_at', now);
