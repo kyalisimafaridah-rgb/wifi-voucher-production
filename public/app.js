@@ -291,6 +291,17 @@ function renderPaymentInstructions(instructions, payment) {
   const box = $('payment-instructions');
   if (!box) return;
   box.classList.remove('hidden');
+
+  if (instructions.mode === 'pesapal_checkout' && instructions.redirect_url) {
+    box.innerHTML = `
+      <strong>Secure checkout ready</strong>
+      <div>Continue to PesaPal to choose your payment method and complete the payment.</div>
+      <button type="button" class="btn" id="open-pesapal-checkout" style="margin-top:.75rem">Continue to secure payment</button>
+      <div class="hint" style="margin-top:.5rem">WiFi Voucher verifies the payment directly with PesaPal before restoring access.</div>`;
+    $('open-pesapal-checkout')?.addEventListener('click', () => window.location.assign(instructions.redirect_url));
+    return;
+  }
+
   box.innerHTML = `
     <strong>Payment started</strong>
     <div>Send <b>${escapeHtml(Number(instructions.amount_ugx || payment.amount_ugx).toLocaleString())} UGX</b> to <b>${escapeHtml(instructions.merchant_number || 'the configured merchant number')}</b>.</div>
@@ -314,20 +325,24 @@ async function pollPayment(id) {
       ? 'Payment verified. Restoring your account…'
       : payment.status === 'failed'
         ? 'The payment failed. You can start another payment.'
-        : 'Waiting for payment verification…';
+        : payment.status === 'processing'
+          ? 'Payment received. Waiting for final confirmation…'
+          : 'Waiting for payment verification…';
+
     if (payment.status === 'succeeded') {
       stopPaymentPolling();
       await enterDashboard();
       return;
     }
     if (['failed','expired','cancelled','refunded','disputed'].includes(payment.status)) stopPaymentPolling();
-  } catch (err) {
+  } catch {
     if ($('payment-status')) $('payment-status').textContent = 'Still checking your payment…';
   }
+
   paymentPollAttempts += 1;
   if (paymentPollAttempts >= 120) {
     stopPaymentPolling();
-    if ($('payment-status')) $('payment-status').textContent = 'We stopped automatic checking after 10 minutes. Your payment can still be matched; log in again later to check.';
+    if ($('payment-status')) $('payment-status').textContent = 'We stopped automatic checking after 10 minutes. You can log in again later to check the payment.';
   }
 }
 
@@ -343,16 +358,23 @@ async function startPayment(provider) {
   const status = $('payment-status');
   try {
     optionsEl?.querySelectorAll('button').forEach((b) => { b.disabled = true; });
-    if (status) status.textContent = 'Creating a secure payment record…';
-    const phone = window.prompt('Mobile Money number (optional):') || '';
+    if (status) status.textContent = provider === 'pesapal' ? 'Preparing secure checkout…' : 'Creating a secure payment record…';
+
+    const phone = provider === 'pesapal' ? '' : (window.prompt('Mobile Money number (optional):') || '');
     const key = (window.crypto?.randomUUID ? window.crypto.randomUUID() : 'wv-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+
     const res = await api('/billing/payment-intents', {
       method: 'POST',
       body: JSON.stringify({ provider, payer_phone: phone.trim() || null, idempotency_key: key }),
     });
+
     renderPaymentInstructions(res.instructions, res.payment);
-    if (status) status.textContent = 'Waiting for payment verification…';
+    if (status) status.textContent = provider === 'pesapal' ? 'Secure checkout is ready.' : 'Waiting for payment verification…';
     startPaymentPolling(res.payment.id);
+
+    if (provider === 'pesapal' && res.instructions.redirect_url) {
+      window.setTimeout(() => window.location.assign(res.instructions.redirect_url), 300);
+    }
   } catch (err) {
     if (status) status.textContent = err.message || 'Could not start payment.';
     optionsEl?.querySelectorAll('button').forEach((b) => { b.disabled = false; });
@@ -364,15 +386,20 @@ async function loadPaymentOptions() {
   const amountEl = $('payment-amount');
   const status = $('payment-status');
   if (!optionsEl) return;
+
   try {
     const res = await api('/billing/payment-options');
     if (amountEl) amountEl.textContent = Number(res.amount_ugx || 0).toLocaleString() + ' UGX / ' + Number(res.period_days || 30) + ' days';
+
     optionsEl.innerHTML = (res.options || []).map((option) => `
       <button type="button" class="btn payment-option" data-payment-provider="${escapeHtml(option.provider)}" ${option.configured ? '' : 'disabled'}>
-        <b>${escapeHtml(option.provider.toUpperCase())} Mobile Money</b>
-        <small>${option.configured ? 'Pay using the merchant account' : 'Not configured yet'}</small>
+        <b>${option.provider === 'pesapal' ? 'PesaPal Secure Checkout' : escapeHtml(option.provider.toUpperCase() + ' Mobile Money')}</b>
+        <small>${option.configured
+          ? (option.provider === 'pesapal' ? 'Pay through secure checkout' : 'Pay using the merchant account')
+          : 'Not configured yet'}</small>
       </button>`).join('');
-    if (!res.options?.some((x) => x.configured) && status) status.textContent = 'Mobile Money checkout is not configured yet. The app owner must add a merchant account first.';
+
+    if (!res.options?.some((x) => x.configured) && status) status.textContent = 'Payment checkout is not configured yet. Please contact the app owner.';
   } catch (err) {
     optionsEl.innerHTML = '<p class="hint">Payment options could not be loaded. Please try again.</p>';
     if (status) status.textContent = err.message || 'Could not load payment options.';
@@ -1245,6 +1272,23 @@ if ('serviceWorker' in navigator) {
     hideAllScreens();
     show($('recovery-screen'));
     return;
+  }
+
+  const paymentId = new URLSearchParams(window.location.search).get('payment');
+  if (paymentId) {
+    const { data: { session: paymentSession } } = await window.__wvSupabaseClient.auth.getSession();
+    if (paymentSession) {
+      window.__wvAccessToken = paymentSession.access_token;
+      hideAllScreens();
+      show($('expired-screen'));
+      bindPaymentCheckout();
+      const paymentStatus = new URLSearchParams(window.location.search).get('payment_status');
+      if ($('payment-status')) $('payment-status').textContent = paymentStatus === 'succeeded'
+        ? 'Payment verified. Restoring your account…'
+        : 'Checking your payment…';
+      startPaymentPolling(paymentId);
+      return;
+    }
   }
 
   const { data: { session } } = await window.__wvSupabaseClient.auth.getSession();
