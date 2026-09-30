@@ -30,3 +30,13 @@ services:
         value: "30"
       - key: MOMO_SMS_WEBHOOK_SECRET
         sync: false
+      - key: APP_URL
+        sync: false
+      - key: BUSINESS_NAME
+        sync: false
+      - key: BUSINESS_EMAIL
+        sync: false
+      - key: MOMO_MTN_MERCHANT_NUMBER
+        sync: false
+      - key: MOMO_AIRTEL_MERCHANT_NUMBER
+        sync: false
