@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
-import { paymentOptions, createPaymentIntent, getPaymentIntent, cancelPaymentIntent, PRICE } from '../services/payment-engine.js';
+import { paymentOptions, createPaymentIntent, getPaymentIntent, cancelPaymentIntent, PRICE, PERIOD_DAYS } from '../services/payment-engine.js';
 
 const createSchema = z.object({
   provider: z.enum(['mtn', 'airtel']),
@@ -11,7 +11,7 @@ const createSchema = z.object({
 export default async function paymentRoutes(fastify) {
   fastify.addHook('preHandler', requireAuth);
   fastify.get('/billing/payment-options', async (_request, reply) => reply.send({
-    amount_ugx: PRICE, currency: 'UGX', options: paymentOptions(),
+    amount_ugx: PRICE, period_days: PERIOD_DAYS, currency: 'UGX', options: paymentOptions(),
     message: 'Choose your mobile-money network. Your payment is verified before access is activated.',
   }));
 
