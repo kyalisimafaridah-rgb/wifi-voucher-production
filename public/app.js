@@ -295,7 +295,7 @@ function renderPaymentInstructions(instructions, payment) {
     <strong>Payment started</strong>
     <div>Send <b>${escapeHtml(Number(instructions.amount_ugx || payment.amount_ugx).toLocaleString())} UGX</b> to <b>${escapeHtml(instructions.merchant_number || 'the configured merchant number')}</b>.</div>
     <div class="hint" style="margin-top:.5rem">Reference: <span class="payment-reference">${escapeHtml(instructions.reference || payment.merchant_reference)}</span></div>
-    <div class="hint" style="margin-top:.5rem">We will verify the payment before restoring access. You do not need to mark yourself as paid.</div>`;
+    <div class="hint" style="margin-top:.5rem">We will verify the payment before restoring access. Keep the payment confirmation SMS until your payment is verified.</div>`;
 }
 
 function stopPaymentPolling() {
@@ -366,7 +366,7 @@ async function loadPaymentOptions() {
   if (!optionsEl) return;
   try {
     const res = await api('/billing/payment-options');
-    if (amountEl) amountEl.textContent = Number(res.amount_ugx || 0).toLocaleString() + ' UGX / 30 days';
+    if (amountEl) amountEl.textContent = Number(res.amount_ugx || 0).toLocaleString() + ' UGX / ' + Number(res.period_days || 30) + ' days';
     optionsEl.innerHTML = (res.options || []).map((option) => `
       <button type="button" class="btn payment-option" data-payment-provider="${escapeHtml(option.provider)}" ${option.configured ? '' : 'disabled'}>
         <b>${escapeHtml(option.provider.toUpperCase())} Mobile Money</b>
