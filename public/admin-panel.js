@@ -241,7 +241,7 @@
     ['auth-screen','recovery-screen','expired-screen','dashboard'].forEach(function(id){ var node=el(id); if(node) node.classList.add('hidden'); });
     var admin = el('admin-screen');
     if (admin) admin.classList.remove('hidden');
-    el('admin-email-display').textContent = window.__wvAdminEmail || '';
+    try { var me = await get('/me'); el('admin-email-display').textContent = me.owner?.email || me.email || ''; } catch (_) {}
     bind();
     await loadAll();
     setTab(activeTab);
