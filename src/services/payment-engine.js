@@ -54,17 +54,24 @@ export async function cancelPaymentIntent(ownerId, id) {
 }
 
 export async function confirmPaymentIntent(id, providerTransactionId, eventPayload = {}) {
+  const provider = eventPayload.provider || 'manual';
+  const amountUgx = Number(eventPayload.amountUgx);
+  if (!Number.isInteger(amountUgx) || amountUgx < 1) {
+    throw new Error('A valid payment amount is required');
+  }
+
   const { data, error } = await supabase.rpc('confirm_payment_intent', {
-    p_intent_id: id, p_provider_transaction_id: providerTransactionId || null, p_period_days: PERIOD_DAYS,
+    p_intent_id: id,
+    p_provider: provider,
+    p_amount_ugx: amountUgx,
+    p_provider_transaction_id: providerTransactionId || null,
+    p_provider_event_id: eventPayload.providerEventId || null,
+    p_event_type: eventPayload.eventType || 'payment.confirmed',
+    p_signature_valid: eventPayload.signatureValid ?? null,
+    p_payload: eventPayload.payload || {},
+    p_period_days: PERIOD_DAYS,
   });
   if (error) throw new Error('Could not confirm payment: ' + error.message);
-  const event = await supabase.from('payment_events').insert({
-    payment_intent_id: id, provider: eventPayload.provider || 'manual', provider_event_id: eventPayload.providerEventId || null,
-    event_type: eventPayload.eventType || 'payment.confirmed', status: 'succeeded', amount_ugx: eventPayload.amountUgx || null,
-    currency: 'UGX', provider_transaction_id: providerTransactionId || null, signature_valid: eventPayload.signatureValid ?? null,
-    payload: eventPayload.payload || {},
-  });
-  if (event.error && event.error.code !== '23505') throw new Error('Could not record payment event: ' + event.error.message);
   return data?.[0] || null;
 }
 
