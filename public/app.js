@@ -503,7 +503,13 @@ async function loadRouters() {
   list.innerHTML = '';
 
   if (!routersCache.length) {
-    list.innerHTML = '<p class="hint">No routers yet. Add your first MikroTik.</p>';
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">⌁</div>
+        <h3>Your hotspot starts here</h3>
+        <p>Connect your MikroTik once. We’ll verify the connection before you create any vouchers.</p>
+        <button class="btn primary" data-empty-action="router">Connect my router</button>
+      </div>`;
     return;
   }
 
@@ -515,12 +521,12 @@ async function loadRouters() {
     const agent = Array.isArray(r.router_agents) ? r.router_agents[0] : r.router_agents;
     const agentOnline = agent?.status === 'online';
     const connectorOnline = connector?.status === 'online';
-    const endpoint = agentOnline ? '🟢 Cloud Agent online' : connectorOnline ? '🟢 LAN Connector online' : (r.status || '⚪ Waiting for connection');
+    const endpoint = agentOnline ? 'Connected' : connectorOnline ? 'Connected' : (r.status || 'Waiting for connection');
     const statusClass = agentOnline || connectorOnline ? 'connected' : (r.status || 'unknown');
     div.innerHTML = `
       <div>
         <strong><span class="status-dot ${statusClass}"></span>${escapeHtml(r.label)}</strong>
-        <div class="meta">${agentOnline ? 'Adaptive Cloud Agent · ' : connectorOnline ? 'LAN Connector · ' : (r.host ? escapeHtml(r.host) + ':' + r.api_port + ' · ' : '')}${endpoint} · Last seen: ${lastSeen}</div>
+        <div class="meta">${endpoint} · Last seen: ${lastSeen}${agentOnline || connectorOnline ? ' · Automatic connection' : ''}</div>
       </div>
       <div class="actions">
         <button class="btn small" data-retest="${r.id}">Re-test</button>
@@ -687,7 +693,13 @@ async function loadProfiles() {
   list.innerHTML = '';
 
   if (!profilesCache.length) {
-    list.innerHTML = '<p class="hint">No profiles yet. Create packages like “1 Hour” or “500MB”.</p>';
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">◈</div>
+        <h3>Create your first package</h3>
+        <p>Choose a simple offer such as 1 Hour, 500 MB or 1 Day. You can change it later.</p>
+        <button class="btn primary" data-empty-action="profile" ${routersCache.length ? '' : 'disabled'}>Create a package</button>
+      </div>`;
     return;
   }
 
@@ -796,7 +808,12 @@ async function loadVouchers(limit) {
   list.innerHTML = '';
 
   if (!vouchers?.length) {
-    list.innerHTML = '<p class="hint">No vouchers generated yet.</p>';
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">#</div>
+        <h3>Your first voucher is one click away</h3>
+        <p>Choose a package above, then generate the codes on your connected router.</p>
+      </div>`;
     hide($('load-more-vouchers'));
     return;
   }
@@ -1049,6 +1066,17 @@ document.addEventListener('click', async (e) => {
     syncV.textContent = 'Sync voucher status';
   }
 
+  const emptyAction = e.target.closest('[data-empty-action]');
+  if (emptyAction) {
+    if (emptyAction.dataset.emptyAction === 'router') openOnboarding();
+    if (emptyAction.dataset.emptyAction === 'profile' && !emptyAction.disabled) {
+      fillProfileSelect();
+      $('profile-form').reset();
+      show($('modal-profile'));
+    }
+    return;
+  }
+
   const delR = e.target.closest('[data-del-router]');
   if (delR && confirm('Delete this router and its profiles/vouchers?')) {
     try {
@@ -1173,8 +1201,8 @@ function renderOnboarding() {
   $('onboarding-progress-bar').style.width = `${(s / onboarding.total) * 100}%`;
   $('onboarding-back').classList.toggle('hidden', s === 1 || s === 4);
   $('onboarding-skip').classList.toggle('hidden', s >= 3);
-  $('onboarding-next').classList.toggle('hidden', s === 3);
-  $('onboarding-next').textContent = s === 4 ? 'Done' : 'Continue';
+  $('onboarding-next').classList.toggle('hidden', false);
+  $('onboarding-next').textContent = s === 3 ? 'Check my router' : (s === 4 ? (onboarding.verified ? 'Done' : 'Retry connection') : 'Continue');
   $('onboarding-status').textContent = '';
 
   const body = $('onboarding-body');
@@ -1184,7 +1212,10 @@ function renderOnboarding() {
       <div class="onboarding-hero">
         <span class="eyebrow">Automatic setup</span>
         <h2 id="onboarding-title">Let’s connect your WiFi router.</h2>
-        <p>You do not need to know your router version, IP address, firewall settings or ISP type. WiFi Voucher will detect those things for you and automatically recover when your Internet address changes.</p>
+        <p>We’ll keep the technical work out of your way. You only need access to the MikroTik for one setup step.</p>
+        <div class="onboarding-meta">
+          <span>One-time setup</span><span>No router password needed</span><span>Automatic verification</span>
+        </div>
       </div>
       <div class="onboarding-checks">
         <div>✓ Detect router version</div>
@@ -1193,33 +1224,38 @@ function renderOnboarding() {
         <div>✓ Find the safest connection path</div>
         <div>✓ Test the connection before we say “ready”</div>
       </div>
-      <div class="onboarding-callout"><strong>What you need:</strong> access to the MikroTik router for one short setup step. We will do the technical diagnosis automatically.</div>
+      <div class="onboarding-callout"><strong>What you need:</strong> access to the MikroTik router. We’ll do the technical diagnosis automatically.</div>
     `;
   } else if (s === 2) {
     body.innerHTML = `
-      <h2>Give your router a name</h2>
-      <p class="hint">For example: Shop, Cafe, Hostel or Office.</p>
+      <h2>Name this router</h2>
+      <p class="hint">This is only for you, so you can recognize it later. For example: Shop, Cafe, Hostel or Office.</p>
       <label for="ob-label">Router name</label>
       <input id="ob-label" maxlength="100" value="${escapeHtml(onboarding.label)}" placeholder="My Shop" autocomplete="off" />
-      <div class="onboarding-callout"><strong>Next:</strong> we will create a private connection for this router. You will paste one generated setup script into the router once. It will install a persistent connection and restart automatically after router reboots.</div>
+      <div class="onboarding-callout"><strong>Next:</strong> we’ll generate a private setup script for this router. You can leave the setup and come back later.</div>
     `;
     $('ob-label').focus();
   } else if (s === 3) {
     body.innerHTML = `
-      <h2>Connect your router</h2>
-      <p class="hint">This is the only technical step. Open the MikroTik terminal, paste the script below, and run it once. After that, WiFi Voucher takes over.</p>
+      <h2>One quick setup on your router</h2>
+      <p class="hint">This is the only technical step. Copy the private script, open the MikroTik terminal, paste it, and run it once.</p>
+      <div class="onboarding-instructions">
+        <div class="onboarding-instruction"><b>1</b><span>Copy the private setup script below.</span></div>
+        <div class="onboarding-instruction"><b>2</b><span>Open your MikroTik terminal and paste it.</span></div>
+        <div class="onboarding-instruction"><b>3</b><span>Run it once, then return here and tap “Check my router”.</span></div>
+      </div>
       <div class="onboarding-result">
         <textarea id="onboarding-agent-script" class="code-block" rows="16" readonly>Preparing your private connection…</textarea>
         <button type="button" class="btn small" id="copy-onboarding-script" disabled>Copy setup script</button>
-        <div class="onboarding-callout"><strong>Keep it private.</strong> This script contains a private connection token for your router.</div>
+        <div class="onboarding-callout"><strong>Keep it private.</strong> This script contains a private connection token for this router. We never need you to type the router password here.</div>
       </div>
     `;
     if (!onboarding.provisioned) provisionOnboarding();
   } else {
     body.innerHTML = `
-      <h2>We’re checking your router</h2>
+      <h2>Checking your router</h2>
       <div id="onboarding-verify-content">
-        <p>WiFi Voucher is detecting the router and choosing the connection path automatically…</p>
+        <div class="onboarding-wait"><span class="onboarding-wait-dot"></span><span><strong>Looking for your router…</strong><br><small class="hint">This can take a few moments.</small></span></div>
         <div class="onboarding-checks">
           <div>⏳ Finding your router</div>
           <div>⏳ Reading router details</div>
@@ -1342,9 +1378,10 @@ async function verifyOnboarding() {
     const board = detected.board || agent.board_name || 'MikroTik hardware';
 
     out.innerHTML = `
-      <div class="onboarding-result">
-        <strong>Connected successfully.</strong>
-        <p>We detected <strong>${escapeHtml(board)}</strong> running RouterOS <strong>${escapeHtml(version)}</strong>.</p>
+      <div class="success-result">
+        <h3>You’re connected.</h3>
+        <p>WiFi Voucher found your <strong>${escapeHtml(board)}</strong> running RouterOS <strong>${escapeHtml(version)}</strong>.</p>
+        <span class="connection-pill">✓ Secure connection verified</span>
         <div class="onboarding-checks">
           <div>✓ Router identified</div>
           <div>✓ Internet path verified</div>

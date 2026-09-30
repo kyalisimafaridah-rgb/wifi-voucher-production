@@ -665,3 +665,34 @@ a { color: inherit; }
   .onboarding-actions .btn { min-height:48px; }
   .code-block { font-size:.72rem; max-height:38vh; }
 }
+
+/* Psychology-led UX: cognitive ease, autonomy, clear feedback and mobile comfort */
+:root { --focus-ring: 0 0 0 3px rgba(16,185,129,.28); }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline:none; box-shadow:var(--focus-ring); }
+.btn { min-height:44px; }
+.form label { color:#a6c6ba; font-weight:600; }
+.form input::placeholder { color:#5f8275; }
+.auth-start-hint { line-height:1.55; }
+.auth-start-hint strong { color:#c9eee0; }
+.hero-btn { min-height:48px; }
+.trust-row span { white-space:nowrap; }
+.empty-state { text-align:center; padding:1.5rem; background:linear-gradient(180deg,#0d241b,#0a1b15); border:1px solid var(--border); border-radius:15px; }
+.empty-state-icon { width:46px; height:46px; margin:0 auto .8rem; display:grid; place-items:center; border-radius:14px; background:#0a3324; color:#6ee7b7; font-size:1.25rem; font-weight:900; }
+.empty-state h3 { margin-bottom:.35rem; }
+.empty-state p { color:var(--muted); max-width:42ch; margin:0 auto .9rem; font-size:.88rem; }
+.empty-state .btn { margin-top:.2rem; }
+.onboarding-meta { display:flex; flex-wrap:wrap; gap:.5rem; margin:.85rem 0 0; }
+.onboarding-meta span { padding:.35rem .55rem; border:1px solid var(--border); border-radius:999px; color:#a9d8c7; background:#0a2119; font-size:.72rem; }
+.onboarding-instructions { display:grid; gap:.55rem; margin:1rem 0; }
+.onboarding-instruction { display:flex; gap:.7rem; align-items:flex-start; padding:.7rem .75rem; border:1px solid var(--border); border-radius:11px; background:#0a2119; }
+.onboarding-instruction b { flex:0 0 25px; height:25px; display:grid; place-items:center; border-radius:50%; background:#0f5139; color:#bff7df; font-size:.75rem; }
+.onboarding-instruction span { color:#c9eee0; font-size:.84rem; line-height:1.45; }
+.onboarding-wait { display:flex; align-items:center; gap:.7rem; padding:.8rem; border:1px solid #1a5a43; border-radius:12px; background:#0b2a20; }
+.onboarding-wait-dot { width:10px; height:10px; border-radius:50%; background:#fbbf24; box-shadow:0 0 0 5px rgba(251,191,36,.1); animation:onboarding-pulse 1.5s ease-in-out infinite; }
+@keyframes onboarding-pulse { 50% { opacity:.35; transform:scale(.8); } }
+.success-result { border:1px solid #1a6b4d; background:#0b2a20; border-radius:14px; padding:1rem; }
+.success-result h3 { color:#dff8ee; margin-bottom:.3rem; }
+.connection-pill { display:inline-flex; align-items:center; gap:.35rem; margin-top:.55rem; padding:.35rem .6rem; border-radius:999px; background:#092d20; border:1px solid #1a5a43; color:#9ee9ca; font-size:.72rem; font-weight:700; }
+@media (max-width:640px) { .trust-row span { white-space:normal; } .hero-actions .hero-btn,.hero-actions .text-link { width:100%; text-align:center; } .hero-actions .text-link { padding:.6rem; } .onboarding-instruction { padding:.65rem; } }
+@media (prefers-reduced-motion:reduce) { .onboarding-wait-dot { animation:none; } }

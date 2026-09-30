@@ -10,7 +10,7 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/logo.svg",
+      "src": "/logo.svg?v=20260930-ux",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
