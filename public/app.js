@@ -317,7 +317,7 @@ async function enterDashboard() {
   // Admin accounts always land on the admin panel, regardless of their own
   // personal subscription status — admin access is not tied to being a paying owner.
   if (owner.role === 'admin') {
-    await showAdminScreen();
+    await window.showAdminScreen();
     return;
   }
 
