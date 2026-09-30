@@ -1,4 +1,5 @@
 import { supabase } from '../db/supabase.js';
+import { confirmPaymentIntent } from './payment-engine.js';
 
 // Flat monthly subscription price. One price for now — if you add
 // tiers later, findPendingPaymentsByAmount is the only place that
@@ -107,7 +108,28 @@ export const momoStorageAdapter = {
     }
   },
 
-  async onPaymentMatched(payment, _parsed) {
+  async onPaymentMatched(payment, parsed) {
+    const { data: intent } = await supabase
+      .from('payment_intents')
+      .select('id,provider,amount_ugx,status,created_at')
+      .eq('owner_id', payment.id)
+      .eq('amount_ugx', payment.amountUgx)
+      .in('status', ['created', 'pending', 'processing'])
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (intent) {
+      await confirmPaymentIntent(intent.id, parsed.transactionId, {
+        provider: parsed.network,
+        providerEventId: parsed.transactionId,
+        eventType: 'momo.sms.matched',
+        amountUgx: parsed.amountUgx,
+        payload: { network: parsed.network },
+      });
+      return;
+    }
+
     const { data: owner, error: fetchError } = await supabase
       .from('owners')
       .select('subscription_paid_until')
