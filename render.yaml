@@ -40,3 +40,13 @@ services:
         sync: false
       - key: MOMO_AIRTEL_MERCHANT_NUMBER
         sync: false
+      - key: PESAPAL_ENV
+        value: live
+      - key: PESAPAL_CONSUMER_KEY
+        sync: false
+      - key: PESAPAL_CONSUMER_SECRET
+        sync: false
+      - key: PESAPAL_IPN_ID
+        sync: false
+      - key: PESAPAL_CALLBACK_URL
+        sync: false
