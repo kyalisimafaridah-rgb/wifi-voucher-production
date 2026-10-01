@@ -1714,22 +1714,26 @@ async function verifyOnboarding() {
       </div>
     `;
 
-    const result = await api(`/routers/${onboarding.router.id}/retest`, { method: 'POST' });
+    const result = await api(`/routers/${onboarding.router.id}/readiness`, { method: 'POST' });
     if (!result?.success) throw new Error(result?.message || 'Router verification failed.');
 
-    const detected = result.router || {};
+    const detected = result.result || {};
     const version = detected.version || agent.routeros_version || 'detected';
     const board = detected.board || agent.board_name || 'MikroTik hardware';
 
+    if (detected.hotspot_ready === false) {
+      throw new Error('Your router is connected, but the MikroTik Hotspot service is not configured yet. Finish the Hotspot setup, then check the router again.');
+    }
+
     out.innerHTML = `
       <div class="success-result">
-        <h3>You’re connected.</h3>
+        <h3>You’re connected and ready.</h3>
         <p>WiFi Voucher found your <strong>${escapeHtml(board)}</strong> running RouterOS <strong>${escapeHtml(version)}</strong>.</p>
         <span class="connection-pill">✓ Secure connection verified</span>
         <div class="onboarding-checks">
           <div>✓ Router identified</div>
-          <div>✓ Internet path verified</div>
-          <div>✓ Secure remote connection ready</div>
+          <div>✓ Connection path verified</div>
+          <div>✓ Hotspot service detected</div>
           <div>✓ Ready for vouchers</div>
         </div>
       </div>
