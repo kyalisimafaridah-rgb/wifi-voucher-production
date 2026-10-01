@@ -189,30 +189,76 @@ export function buildRouterOSAgentScript({ server, token }) {
 }
 
 export async function runAdaptiveRouterOperation(router, operation, payload={}, timeoutMs=30000) {
-  // 1) RouterOS cloud agent: outbound HTTPS, works behind NAT/CGNAT.
-  const { data: agent } = await supabase.from('router_agents')
-    .select('id,status,last_seen_at').eq('router_id',router.id).maybeSingle();
-  if(agent?.status==='online' && agent.last_seen_at && Date.now()-new Date(agent.last_seen_at).getTime()<90000){
-    try { return await queueAgentCommand(agent.id,operation,payload,timeoutMs); }
-    catch (err) {
-      if (!['AGENT_TIMEOUT','AGENT_COMMAND_FAILED'].includes(err.code)) throw err;
-      if (err.code === 'AGENT_COMMAND_FAILED') throw err;
-    }
-  }
+  // Adaptive routing is deliberately independent of the saved connection_mode.
+  // A preferred path is tried first, but a temporary failure must not strand the
+  // customer when another configured path can still reach the router.
+  const [{ data: agent }, { data: connector }] = await Promise.all([
+    supabase.from('router_agents').select('id,status,last_seen_at').eq('router_id', router.id).maybeSingle(),
+    supabase.from('connector_devices').select('id,status,last_seen_at').eq('router_id', router.id).maybeSingle(),
+  ]);
 
-  // 2) Existing outbound LAN connector.
-  if(router.connection_mode==='connector'){
-    const { data: device } = await supabase.from('connector_devices').select('id,status').eq('router_id',router.id).maybeSingle();
-    if(device?.status==='online'){
-      const { sendConnectorCommand } = await import('./connector.js');
-      try { return await sendConnectorCommand(device.id,operation,payload,timeoutMs); }
-      catch (err) {
-        if (err.code === 'CONNECTOR_COMMAND_FAILED') throw err;
+  const fresh = (lastSeenAt) => Boolean(lastSeenAt) && Date.now() - new Date(lastSeenAt).getTime() < 90000;
+  const candidates = [];
+
+  if (router.connection_mode === 'agent') candidates.push('cloud');
+  if (router.connection_mode === 'connector') candidates.push('local');
+  if (router.connection_mode === 'direct') candidates.push('direct');
+
+  for (const path of ['cloud', 'local', 'direct']) if (!candidates.includes(path)) candidates.push(path);
+
+  const attempts = [];
+
+  for (const path of candidates) {
+    try {
+      if (path === 'cloud') {
+        if (!agent || agent.status !== 'online' || !fresh(agent.last_seen_at)) {
+          attempts.push({ path, code: 'AGENT_OFFLINE', message: 'Secure cloud connection is offline.' });
+          continue;
+        }
+        return await queueAgentCommand(agent.id, operation, payload, timeoutMs);
       }
+
+      if (path === 'local') {
+        if (!connector || connector.status !== 'online' || !fresh(connector.last_seen_at)) {
+          attempts.push({ path, code: 'CONNECTOR_OFFLINE', message: 'Local connection helper is offline.' });
+          continue;
+        }
+        const { sendConnectorCommand } = await import('./connector.js');
+        return await sendConnectorCommand(connector.id, operation, payload, timeoutMs);
+      }
+
+      const hasDirectCredentials = Boolean(router.host && router.api_username && router.api_password_encrypted);
+      if (!hasDirectCredentials) {
+        attempts.push({ path, code: 'DIRECT_NOT_CONFIGURED', message: 'Direct router connection is not configured.' });
+        continue;
+      }
+
+      const password = decrypt(router.api_password_encrypted);
+      return await executeConnectorOperation(operation, {
+        ...payload,
+        host: router.host,
+        port: router.api_port,
+        username: router.api_username,
+        password,
+        secure: router.api_tls,
+      });
+    } catch (err) {
+      attempts.push({
+        path,
+        code: err.code || 'CONNECTION_FAILED',
+        message: err.message || 'Connection attempt failed',
+      });
+      // A transport failure should fall through to the next available path.
+      // A router/application rejection is also recorded, but the next configured
+      // path gets a chance because the owner asked for an adaptive connection.
     }
   }
 
-  // 3) Direct RouterOS API/secure API-SSL.
-  const password=decrypt(router.api_password_encrypted);
-  return executeConnectorOperation(operation,{...payload,host:router.host,port:router.api_port,username:router.api_username,password,secure:router.api_tls});
+  const error = new Error('Your router could not be reached through any available connection path.');
+  error.code = 'ALL_ROUTER_PATHS_FAILED';
+  error.attempts = attempts;
+  error.message = attempts.length
+    ? attempts.map((a) => a.message).join(' ')
+    : error.message;
+  throw error;
 }
