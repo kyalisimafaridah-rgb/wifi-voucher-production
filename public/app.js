@@ -199,6 +199,16 @@ async function handleLockGoogleAuth() {
   }
 }
 
+$('lock-login-form').addEventListener('submit', handleLockLogin);
+$('lock-google-btn').addEventListener('click', handleLockGoogleAuth);
+$('lock-use-different-account').addEventListener('click', () => {
+  inactivityLocked = false;
+  currentOwner = null;
+  hideAllScreens();
+  show($('auth-screen'));
+  document.querySelector('.tab[data-tab="login"]')?.click();
+});
+
 // ---------- Password visibility toggles ----------
 document.querySelectorAll('.password-toggle').forEach((btn) => {
   btn.addEventListener('click', () => {
