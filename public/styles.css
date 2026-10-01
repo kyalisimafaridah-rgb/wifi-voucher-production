@@ -1059,3 +1059,44 @@ code, pre, .code-block, .payment-reference, .admin-detail-row, .admin-list-row,
 @media (min-width:701px) {
   .app-topbar { padding-left:clamp(1rem,4vw,2rem); padding-right:clamp(1rem,4vw,2rem); }
 }
+
+
+/* Dedicated security lock screen */
+.lock-screen {
+  min-height:100dvh;
+  display:grid;
+  place-items:center;
+  padding:1.25rem;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(52,211,153,.10), transparent 28rem),
+    var(--app-bg, #07130f);
+}
+.lock-card {
+  width:min(100%, 430px);
+  padding:clamp(1.25rem,5vw,2rem);
+  border:1px solid rgba(157,222,197,.14);
+  box-shadow:0 24px 70px rgba(0,0,0,.28);
+}
+.lock-icon {
+  width:58px;
+  height:58px;
+  margin:1.5rem auto 1rem;
+  display:grid;
+  place-items:center;
+  border-radius:18px;
+  font-size:1.7rem;
+  color:#6ee7b7;
+  background:rgba(52,211,153,.10);
+  border:1px solid rgba(52,211,153,.18);
+}
+.lock-card h2 { text-align:center; margin:.25rem 0 .45rem; }
+.lock-card > p { text-align:center; margin:0 auto 1.35rem; max-width:34rem; }
+.lock-card .auth-brand { justify-content:center; }
+.lock-card .form { margin-top:.5rem; }
+.lock-card .form > .btn { width:100%; }
+.lock-card .link-btn { width:100%; text-align:center; }
+
+@media (max-width:480px) {
+  .lock-screen { padding:.75rem; }
+  .lock-card { border-radius:16px; padding:1.1rem; }
+}
