@@ -428,9 +428,30 @@ function renderTrialBanner(owner) {
   const div = document.createElement('div');
   div.className = 'banner warning';
   div.textContent = daysRemaining <= 1
-    ? 'Your free trial ends today. Contact the app owner to keep access to your routers and vouchers.'
-    : `Your free trial ends in ${daysRemaining} days. Contact the app owner to activate your subscription.`;
+    ? 'Your free trial ends today. You can activate your subscription from the Subscription button.'
+    : `Your free trial ends in ${daysRemaining} days. You can activate your subscription from the Subscription button.`;
   el.appendChild(div);
+}
+
+function showSubscriptionScreen(owner = currentOwner) {
+  hideAllScreens();
+  show($('expired-screen'));
+
+  const title = $('subscription-title');
+  const message = $('expired-message');
+  if (owner?.subscription_status === 'expired') {
+    if (title) title.textContent = 'Your subscription has ended';
+    if (message) message.textContent = 'Choose a payment method below. Your access is restored only after the payment is verified.';
+  } else if (owner?.subscription_status === 'trial') {
+    if (title) title.textContent = 'Activate your subscription';
+    if (message) message.textContent = 'You can pay before your trial ends. Your current access stays available while your trial is active.';
+  } else {
+    if (title) title.textContent = 'Manage your subscription';
+    if (message) message.textContent = 'Choose a payment method below to extend your subscription. Your payment is verified before the subscription is extended.';
+  }
+
+  bindPaymentCheckout();
+  loadPaymentOptions();
 }
 
 async function enterDashboard() {
@@ -454,9 +475,7 @@ async function enterDashboard() {
   }
 
   if (isSubscriptionExpired(owner)) {
-    show($('expired-screen'));
-    bindPaymentCheckout();
-    loadPaymentOptions();
+    showSubscriptionScreen(owner);
     return;
   }
 
@@ -1096,6 +1115,7 @@ $('forgot-form').addEventListener('submit', handleForgotPassword);
 $('recovery-form').addEventListener('submit', handleRecoverySubmit);
 $('logout-btn').addEventListener('click', logout);
 $('expired-logout-btn').addEventListener('click', logout);
+$('subscription-btn').addEventListener('click', () => showSubscriptionScreen(currentOwner));
 bindPaymentCheckout();
 $('admin-logout-btn').addEventListener('click', logout);
 
