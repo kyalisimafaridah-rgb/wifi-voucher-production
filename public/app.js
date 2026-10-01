@@ -93,12 +93,23 @@ function hideAllScreens() {
 // ---------- Session expiry (mid-session token invalid/expired) ----------
 async function forceSessionExpired() {
   stopInactivityTimer();
-  await window.__wvSupabaseClient.auth.signOut();
+  const hadWorkspace = Boolean(currentOwner?.email);
+  try { await window.__wvSupabaseClient.auth.signOut(); } catch {}
   window.__wvAccessToken = null;
-  currentOwner = null;
-  hideAllScreens();
-  show($('auth-screen'));
-  showToast('Your session expired. Please log in again.', 'error');
+  if (hadWorkspace) {
+    inactivityLocked = true;
+    $('lock-email').value = currentOwner?.email || '';
+    $('lock-password').value = '';
+    setError('lock-error', null);
+    hideAllScreens();
+    show($('lock-screen'));
+    showToast('Your session expired. Unlock your workspace to continue.', 'error');
+  } else {
+    currentOwner = null;
+    hideAllScreens();
+    show($('auth-screen'));
+    showToast('Your session expired. Please log in again.', 'error');
+  }
   sessionExpiredHandled = false;
 }
 
@@ -124,9 +135,16 @@ async function lockForInactivity() {
   setError('lock-error', null);
   hideAllScreens();
   show($('lock-screen'));
-  await window.__wvSupabaseClient.auth.signOut();
-  window.__wvAccessToken = null;
-  showToast('Your workspace was locked after 30 minutes of inactivity.', 'info');
+  try {
+    await window.__wvSupabaseClient.auth.signOut();
+  } catch (error) {
+    // Locking must never depend on a successful network sign-out.
+  } finally {
+    window.__wvAccessToken = null;
+    hideAllScreens();
+    show($('lock-screen'));
+    showToast('Your workspace was locked after 30 minutes of inactivity.', 'info');
+  }
 }
 
 function recordUserActivity() {
@@ -753,38 +771,56 @@ async function loadRouters() {
       <div class="empty-state">
         <div class="empty-state-icon">⌁</div>
         <h3>Your hotspot starts here</h3>
-        <p>Connect your MikroTik once. We’ll verify the connection before you create any vouchers.</p>
+        <p>Connect your MikroTik once. WiFi Voucher will choose the safest available connection and verify it before you create vouchers.</p>
         <button class="btn primary" data-empty-action="router">Connect my router</button>
       </div>`;
     return;
   }
 
+  const diagnostics = await Promise.all(routersCache.map(async (router) => {
+    try {
+      const res = await api(`/routers/${router.id}/connection`);
+      return [router.id, res.connection];
+    } catch {
+      return [router.id, null];
+    }
+  }));
+  const diagnosticMap = new Map(diagnostics);
+
   for (const r of routersCache) {
     const div = document.createElement('div');
     div.className = 'list-item';
     const lastSeen = r.last_connected_at ? new Date(r.last_connected_at).toLocaleString() : 'Never';
-    const connector = Array.isArray(r.connector_devices) ? r.connector_devices[0] : r.connector_devices;
-    const agent = Array.isArray(r.router_agents) ? r.router_agents[0] : r.router_agents;
-    const agentOnline = agent?.status === 'online';
-    const connectorOnline = connector?.status === 'online';
-    const endpoint = agentOnline ? 'Connected' : connectorOnline ? 'Connected' : (r.status || 'Waiting for connection');
-    const statusClass = agentOnline || connectorOnline ? 'connected' : (r.status || 'unknown');
+    const connection = diagnosticMap.get(r.id);
+    const selectedPath = connection?.selected_path;
+    const connected = connection?.state === 'connected';
+    const state = connection?.state || (r.status || 'unknown');
+    const label = connected
+      ? 'Connected'
+      : state === 'attention'
+        ? 'Needs attention'
+        : state === 'needs_setup'
+          ? 'Setup required'
+          : 'Checking connection';
+    const detail = connected
+      ? (selectedPath === 'cloud' ? 'Secure cloud connection' : selectedPath === 'local' ? 'Local connection helper' : 'Direct router connection')
+      : connection?.message || 'We are checking the available connection paths.';
     div.innerHTML = `
-      <div>
-        <strong><span class="status-dot ${statusClass}"></span>${escapeHtml(r.label)}</strong>
-        <div class="meta">${endpoint} · Last seen: ${lastSeen}${agentOnline || connectorOnline ? ' · Automatic connection' : ''}</div>
+      <div class="router-summary">
+        <strong><span class="status-dot ${connected ? 'connected' : state === 'attention' ? 'warning' : 'unknown'}"></span>${escapeHtml(r.label)}</strong>
+        <div class="meta">${escapeHtml(label)} · ${escapeHtml(detail)}</div>
+        <div class="meta">Last confirmed: ${escapeHtml(lastSeen)}</div>
       </div>
       <div class="actions">
-        <button class="btn small" data-retest="${r.id}">Re-test</button>
-        <button class="btn small" data-connector="${r.id}">Remote Connector</button>
-        <button class="btn small" data-sync-vouchers="${r.id}">Sync voucher status</button>
+        <button class="btn small" data-repair-router="${r.id}">${connected ? 'Check connection' : 'Fix connection'}</button>
+        <button class="btn small" data-connector="${r.id}">Remote setup</button>
+        <button class="btn small" data-sync-vouchers="${r.id}">Sync status</button>
         <button class="btn small danger" data-del-router="${r.id}">Delete</button>
       </div>
     `;
     list.appendChild(div);
   }
 }
-
 async function openConnectorModal(routerId) {
   const router = routersCache.find((r) => r.id === routerId);
   if (!router) return;
@@ -1288,22 +1324,40 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
+  const repairBtn = e.target.closest('[data-repair-router]');
+  if (repairBtn) {
+    const id = repairBtn.dataset.repairRouter;
+    repairBtn.disabled = true;
+    const original = repairBtn.textContent;
+    repairBtn.textContent = 'Checking…';
+    try {
+      const res = await api(`/routers/${id}/repair`, { method: 'POST' });
+      showToast(res.message || 'Router connection is healthy.', 'success');
+    } catch (err) {
+      showToast(err.message || 'We could not restore the router connection.', 'error');
+    }
+    repairBtn.disabled = false;
+    repairBtn.textContent = original;
+    await loadRouters();
+    return;
+  }
+
   const retest = e.target.closest('[data-retest]');
   if (retest) {
     const id = retest.dataset.retest;
     retest.disabled = true;
-    retest.textContent = 'Testing…';
+    retest.textContent = 'Checking…';
     try {
-      const res = await api(`/routers/${id}/retest`, { method: 'POST' });
-      showToast('✅ ' + res.message + (res.router?.identity ? ` — ${res.router.identity}` : ''), 'success');
+      const res = await api(`/routers/${id}/repair`, { method: 'POST' });
+      showToast(res.message || 'Router connection is healthy.', 'success');
     } catch (err) {
-      showToast('❌ ' + err.message, 'error');
+      showToast(err.message || 'Router connection needs attention.', 'error');
     }
     retest.disabled = false;
     retest.textContent = 'Re-test';
     await loadRouters();
+    return;
   }
-
   const syncV = e.target.closest('[data-sync-vouchers]');
   if (syncV) {
     const id = syncV.dataset.syncVouchers;
