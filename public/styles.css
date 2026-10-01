@@ -1100,3 +1100,16 @@ code, pre, .code-block, .payment-reference, .admin-detail-row, .admin-list-row,
   .lock-screen { padding:.75rem; }
   .lock-card { border-radius:16px; padding:1.1rem; }
 }
+
+.subscription-actions {
+  display:flex;
+  gap:.65rem;
+  justify-content:center;
+  flex-wrap:wrap;
+  margin-top:1rem;
+}
+.subscription-actions .btn { min-width:150px; }
+@media (max-width:480px) {
+  .subscription-actions { flex-direction:column; }
+  .subscription-actions .btn { width:100%; }
+}
