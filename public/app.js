@@ -598,6 +598,13 @@ async function enterDashboard() {
   await showOwnerDashboard(owner);
 }
 
+async function refreshVoucherStatusesInBackground() {
+  const targets = routersCache.filter((r) => r.status === 'connected').slice(0, 3);
+  if (!targets.length) return;
+  await Promise.allSettled(targets.map((r) => api(`/vouchers/sync?router_id=${r.id}`, { method: 'POST' })));
+  try { await loadVouchers(); } catch {}
+}
+
 async function showOwnerDashboard(owner) {
   hideAllScreens();
   show($('dashboard'));
@@ -631,6 +638,7 @@ async function showOwnerDashboard(owner) {
   }
   fillProfileSelect();
   updatePrerequisiteHints();
+  refreshVoucherStatusesInBackground();
 }
 
 function handleDashboardLoadError(err, listElId, label) {
