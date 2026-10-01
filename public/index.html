@@ -297,6 +297,32 @@
       </main>
     </section>
 
+    <!-- SECURITY LOCK SCREEN: shown after 30 minutes of inactivity; does not return to the landing page -->
+    <section id="lock-screen" class="screen lock-screen hidden">
+      <div class="lock-card card">
+        <div class="auth-brand">
+          <img src="/logo.svg" alt="" />
+          <div><strong>WiFi Voucher</strong><span>Your workspace is locked for security.</span></div>
+        </div>
+        <div class="lock-icon" aria-hidden="true">⌁</div>
+        <h2>Welcome back</h2>
+        <p class="hint">You’ve been inactive for 30 minutes. Sign in to continue where you left off.</p>
+        <form id="lock-login-form" class="form" autocomplete="on">
+          <label for="lock-email">Email</label>
+          <input type="email" id="lock-email" autocomplete="username" inputmode="email" required />
+          <label for="lock-password">Password</label>
+          <div class="password-field">
+            <input type="password" id="lock-password" autocomplete="current-password" required />
+            <button type="button" class="password-toggle" data-toggle-for="lock-password">Show</button>
+          </div>
+          <button type="submit" class="btn primary" id="lock-login-btn">Unlock workspace</button>
+          <button type="button" class="btn google-auth-btn" id="lock-google-btn">Continue with Google</button>
+          <button type="button" class="link-btn" id="lock-use-different-account">Use a different account</button>
+          <p id="lock-error" class="error hidden" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
     <!-- FIRST-RUN ONBOARDING WIZARD -->
     <div id="modal-onboarding" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
       <div class="modal-card onboarding-card">
