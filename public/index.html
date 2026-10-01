@@ -224,21 +224,24 @@
 
     <!-- DASHBOARD -->
     <section id="dashboard" class="screen hidden">
-      <header class="topbar">
-        <div class="brand">WiFi Voucher</div>
+      <header class="topbar app-topbar">
+        <div class="app-brand">
+          <img src="/logo.svg" alt="" class="app-brand-logo" />
+          <div><strong>WiFi Voucher</strong><span>Control center</span></div>
+        </div>
         <div class="user-info">
-          <span id="owner-email"></span>
+          <span id="owner-email" class="owner-email"></span>
           <span id="sub-badge" class="badge"></span>
-          <button id="subscription-btn" class="btn small">Subscription</button>
-          <button id="admin-panel-btn" class="btn small hidden">Admin Panel</button>
-          <button id="logout-btn" class="btn small">Logout</button>
+          <button id="subscription-btn" class="btn small app-top-action" aria-label="Open subscription">Subscription</button>
+          <button id="admin-panel-btn" class="btn small hidden app-top-action">Admin</button>
+          <button id="logout-btn" class="btn small app-top-action">Logout</button>
         </div>
       </header>
 
-      <nav class="nav">
-        <button class="nav-btn active" data-panel="routers">Routers</button>
-        <button class="nav-btn" data-panel="profiles">Profiles</button>
-        <button class="nav-btn" data-panel="vouchers">Vouchers</button>
+      <nav class="nav app-nav" aria-label="Main">
+        <button class="nav-btn active" data-panel="routers"><span class="nav-icon" aria-hidden="true">⌂</span><span>Routers</span></button>
+        <button class="nav-btn" data-panel="profiles"><span class="nav-icon" aria-hidden="true">▦</span><span>Profiles</span></button>
+        <button class="nav-btn" data-panel="vouchers"><span class="nav-icon" aria-hidden="true">◇</span><span>Vouchers</span></button>
       </nav>
 
       <main class="content">
