@@ -11,6 +11,8 @@ export async function testConnection({ host, port, username, password, secure = 
       async (api) => {
         const resources = await api.write('/system/resource/print');
         const identity = await api.write('/system/identity/print');
+        let hotspotServers = [];
+        try { hotspotServers = await api.write('/ip/hotspot/print'); } catch {}
         const res = resources?.[0] || {};
         const id = identity?.[0] || {};
         return {
@@ -18,6 +20,8 @@ export async function testConnection({ host, port, username, password, secure = 
           version: res.version || 'Unknown',
           uptime: res.uptime || null,
           board: res['board-name'] || null,
+          hotspot_ready: Array.isArray(hotspotServers) && hotspotServers.length > 0,
+          hotspot_server_count: Array.isArray(hotspotServers) ? hotspotServers.length : 0,
         };
       }
     );
