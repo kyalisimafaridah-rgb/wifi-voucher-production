@@ -108,7 +108,8 @@ export function buildRouterOSAgentScript({ server, token }) {
       :local identity [/system identity get [find] name]
       :local board [/system resource get [find] board-name]
       :local arch [/system resource get [find] architecture-name]
-      :set result ("{\\"success\\":true,\\"identity\\":\\"" . [$jsonEscape $identity] . "\\",\\"version\\":\\"" . [$jsonEscape $r] . "\\",\\"board\\":\\"" . [$jsonEscape $board] . "\\",\\"architecture\\":\\"" . [$jsonEscape $arch] . "\\"}")
+      :local hotspotCount [:len [/ip hotspot print as-value]]
+      :set result ("{\\"success\\":true,\\"identity\\":\\"" . [$jsonEscape $identity] . "\\",\\"version\\":\\"" . [$jsonEscape $r] . "\\",\\"board\\":\\"" . [$jsonEscape $board] . "\\",\\"architecture\\":\\"" . [$jsonEscape $arch] . "\\",\"hotspot_ready\":" . ([:tostr ($hotspotCount > 0)]) . ",\"hotspot_server_count\":" . ([:tostr $hotspotCount]) . "}")
     }
     :if ($operation = "create_users") do={
       :local created ""
