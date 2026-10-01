@@ -13,6 +13,10 @@ let routersCache = [];
 let profilesCache = [];
 let vouchersLimit = 50;
 let sessionExpiredHandled = false;
+const INACTIVITY_LIMIT_MS = 30 * 60 * 1000;
+let inactivityTimer = null;
+let inactivityLocked = false;
+let lastActivityAt = 0;
 
 // ---------- Helpers ----------
 async function api(path, options = {}) {
@@ -83,11 +87,12 @@ function escapeHtml(str) {
 }
 
 function hideAllScreens() {
-  ['auth-screen', 'recovery-screen', 'expired-screen', 'dashboard', 'admin-screen'].forEach((id) => hide($(id)));
+  ['auth-screen', 'recovery-screen', 'expired-screen', 'dashboard', 'admin-screen', 'lock-screen'].forEach((id) => hide($(id)));
 }
 
 // ---------- Session expiry (mid-session token invalid/expired) ----------
 async function forceSessionExpired() {
+  stopInactivityTimer();
   await window.__wvSupabaseClient.auth.signOut();
   window.__wvAccessToken = null;
   currentOwner = null;
@@ -95,6 +100,85 @@ async function forceSessionExpired() {
   show($('auth-screen'));
   showToast('Your session expired. Please log in again.', 'error');
   sessionExpiredHandled = false;
+}
+
+function stopInactivityTimer() {
+  if (inactivityTimer) clearTimeout(inactivityTimer);
+  inactivityTimer = null;
+}
+
+function resetInactivityTimer() {
+  if (!window.__wvAccessToken || inactivityLocked) return;
+  lastActivityAt = Date.now();
+  stopInactivityTimer();
+  inactivityTimer = setTimeout(lockForInactivity, INACTIVITY_LIMIT_MS);
+}
+
+async function lockForInactivity() {
+  if (!window.__wvAccessToken || inactivityLocked) return;
+  inactivityLocked = true;
+  stopInactivityTimer();
+  const email = currentOwner?.email || '';
+  $('lock-email').value = email;
+  $('lock-password').value = '';
+  setError('lock-error', null);
+  hideAllScreens();
+  show($('lock-screen'));
+  await window.__wvSupabaseClient.auth.signOut();
+  window.__wvAccessToken = null;
+  showToast('Your workspace was locked after 30 minutes of inactivity.', 'info');
+}
+
+function recordUserActivity() {
+  if (window.__wvAccessToken && !inactivityLocked) resetInactivityTimer();
+}
+
+['pointerdown', 'keydown', 'touchstart', 'scroll'].forEach((eventName) => {
+  window.addEventListener(eventName, recordUserActivity, { passive: true });
+});
+
+function showLockLoginError(message) {
+  setError('lock-error', message);
+}
+
+async function handleLockLogin(e) {
+  e.preventDefault();
+  const btn = $('lock-login-btn');
+  showLockLoginError(null);
+  setBtnLoading(btn, 'Unlocking…');
+  try {
+    const email = $('lock-email').value.trim();
+    const password = $('lock-password').value;
+    const { data, error } = await window.__wvSupabaseClient.auth.signInWithPassword({ email, password });
+    if (error || !data?.session) throw new Error(error?.message || 'Could not unlock your workspace.');
+    window.__wvAccessToken = data.session.access_token;
+    inactivityLocked = false;
+    await enterDashboard();
+    resetInactivityTimer();
+  } catch (err) {
+    showLockLoginError(err.message || 'Could not unlock your workspace.');
+  } finally {
+    resetBtn(btn);
+  }
+}
+
+async function handleLockGoogleAuth() {
+  const btn = $('lock-google-btn');
+  showLockLoginError(null);
+  setBtnLoading(btn, 'Connecting…');
+  try {
+    const { error } = await window.__wvSupabaseClient.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + '/',
+        scopes: 'openid email profile https://www.googleapis.com/auth/userinfo.email',
+      },
+    });
+    if (error) throw error;
+  } catch (err) {
+    showLockLoginError(err.message || 'Google sign-in failed. Please try again.');
+    resetBtn(btn);
+  }
 }
 
 // ---------- Password visibility toggles ----------
@@ -175,7 +259,9 @@ async function handleLogin(e) {
       return;
     }
     window.__wvAccessToken = data.session.access_token;
+    inactivityLocked = false;
     await enterDashboard();
+    resetInactivityTimer();
   } finally {
     resetBtn(btn);
   }
@@ -211,12 +297,14 @@ async function handleSignup(e) {
     }
 
     window.__wvAccessToken = data.session.access_token;
+    inactivityLocked = false;
     if (full_name) {
       try {
         await api('/me', { method: 'PATCH', body: JSON.stringify({ full_name }) });
       } catch {}
     }
     await enterDashboard();
+    resetInactivityTimer();
   } catch (err) {
     if (err.status === 409) {
       setError('auth-error', 'This email is already registered — try logging in instead.');
@@ -647,6 +735,8 @@ async function logout() {
   await window.__wvSupabaseClient.auth.signOut();
   window.__wvAccessToken = null;
   currentOwner = null;
+  inactivityLocked = false;
+  stopInactivityTimer();
   hideAllScreens();
   show($('auth-screen'));
 }
