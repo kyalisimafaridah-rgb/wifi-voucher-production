@@ -164,8 +164,14 @@ body {
   margin-right: 0.4rem;
 }
 .status-dot.connected { background: var(--success); }
+.status-dot.warning { background: var(--warning); }
 .status-dot.unreachable { background: var(--danger); }
 .status-dot.unknown { background: var(--muted); }
+
+.router-summary { min-width: 0; flex: 1 1 280px; }
+.router-summary .meta { margin-top: 0.2rem; }
+.router-summary strong { display: block; }
+
 
 .generate-card label { margin-top: 0.75rem; }
 .generate-card select, .generate-card input { margin-bottom: 0.25rem; }
