@@ -20,6 +20,7 @@ import momoWebhookRoutes from './routes/momo-webhook.js';
 import pesapalWebhookRoutes from './routes/pesapal-webhook.js';
 import connectorRoutes from './routes/connector.js';
 import routerAgentRoutes from './routes/router-agent.js';
+import connectionRoutes from './routes/connection.js';
 
 dotenv.config();
 
@@ -83,6 +84,7 @@ await app.register(momoWebhookRoutes);
 await app.register(pesapalWebhookRoutes);
 await app.register(connectorRoutes);
 await app.register(routerAgentRoutes);
+await app.register(connectionRoutes);
 await app.register(fastifyStatic, { root: join(__dirname, '..', 'public'), prefix: '/', wildcard: false });
 
 app.setErrorHandler((error, request, reply) => {
