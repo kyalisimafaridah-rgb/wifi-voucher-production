@@ -12,6 +12,12 @@ export function explainRouterError(error) {
   const code = error?.code || '';
   const message = String(error?.message || '').toLowerCase();
 
+  if (code === 'ALL_ROUTER_PATHS_FAILED') {
+    if (Array.isArray(error?.attempts) && error.attempts.some((a) => a.code === 'DIRECT_NOT_CONFIGURED')) {
+      return 'We could not reach your router through the available secure connections. Keep the router online and use the guided connection setup to restore access.';
+    }
+    return 'We could not reach your router through the available connection paths. Keep the router online and try the automatic repair again.';
+  }
   if (code === 'AGENT_TIMEOUT' || code === 'CONNECTOR_TIMEOUT') {
     return 'The secure connection to your router stopped responding. We are ready to try another connection path.';
   }
