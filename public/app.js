@@ -1205,6 +1205,12 @@ $('forgot-form').addEventListener('submit', handleForgotPassword);
 $('recovery-form').addEventListener('submit', handleRecoverySubmit);
 $('logout-btn').addEventListener('click', logout);
 $('expired-logout-btn').addEventListener('click', logout);
+$('subscription-back-btn').addEventListener('click', async () => {
+  if (currentOwner && !isSubscriptionExpired(currentOwner)) {
+    await showOwnerDashboard(currentOwner);
+    resetInactivityTimer();
+  }
+});
 $('subscription-btn').addEventListener('click', () => showSubscriptionScreen(currentOwner));
 bindPaymentCheckout();
 $('admin-logout-btn').addEventListener('click', logout);
@@ -1405,6 +1411,7 @@ if ('serviceWorker' in navigator) {
   if (session) {
     window.__wvAccessToken = session.access_token;
     await enterDashboard();
+    resetInactivityTimer();
   }
 })();
 
