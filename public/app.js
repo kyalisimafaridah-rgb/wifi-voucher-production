@@ -411,7 +411,7 @@ function renderPaymentInstructions(instructions, payment) {
   if (instructions.mode === 'pesapal_checkout' && instructions.redirect_url) {
     box.innerHTML = `
       <strong>Secure checkout ready</strong>
-      <div>You're paying <b>\${escapeHtml(Number(instructions.amount_ugx || payment.amount_ugx).toLocaleString())} UGX</b> for your WiFi Voucher subscription.</div>
+      <div>You're paying <b>${escapeHtml(Number(instructions.amount_ugx || payment.amount_ugx).toLocaleString())} UGX</b> for your WiFi Voucher subscription.</div>
       <button type="button" class="btn" id="open-pesapal-checkout" style="margin-top:.75rem">Continue to secure payment</button>
       <div class="hint" style="margin-top:.5rem">PesaPal will show any payment-provider charges before you confirm. WiFi Voucher verifies the final payment directly with PesaPal before restoring access.</div>`;
     $('open-pesapal-checkout')?.addEventListener('click', () => window.location.assign(instructions.redirect_url));
