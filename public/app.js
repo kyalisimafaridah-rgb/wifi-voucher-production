@@ -1565,13 +1565,14 @@ function renderOnboarding() {
         <h2 id="onboarding-title">Let’s connect your WiFi router.</h2>
         <p>We’ll keep the technical work out of your way. You only need access to the MikroTik for one setup step.</p>
         <div class="onboarding-meta">
-          <span>One-time setup</span><span>No router password needed</span><span>Automatic verification</span>
+          <span>One-time setup</span><span>No router password needed</span><span>Phone Wi-Fi not required</span><span>Automatic verification</span>
         </div>
+        <div class="onboarding-callout"><strong>Important:</strong> your phone only needs Internet access during setup. It does not need to join the MikroTik Wi-Fi. The MikroTik itself needs Internet access so it can securely check in.</div>
       </div>
       <div class="onboarding-checks">
         <div>✓ Detect router version</div>
         <div>✓ Detect hardware</div>
-        <div>✓ Check Internet access</div>
+        <div>✓ Check the router's Internet access</div>
         <div>✓ Find the safest connection path</div>
         <div>✓ Test the connection before we say “ready”</div>
       </div>
