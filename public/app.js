@@ -560,17 +560,53 @@ function showSubscriptionScreen(owner = currentOwner) {
   hideAllScreens();
   show($('expired-screen'));
 
+  stopPaymentPolling();
+
   const title = $('subscription-title');
   const message = $('expired-message');
-  if (owner?.subscription_status === 'expired') {
+  const backBtn = $('subscription-back-btn');
+  const logoutBtn = $('expired-logout-btn');
+  const checkout = $('payment-checkout');
+
+  const expired = isSubscriptionExpired(owner);
+  const trial = owner?.subscription_status === 'trial';
+
+  if (expired) {
+    // An expired workspace must stay outside the dashboard until payment is
+    // verified. This prevents a dead-end "Back to dashboard" button and also
+    // prevents partially usable dashboard states after the API starts returning
+    // 403 Subscription expired responses.
     if (title) title.textContent = 'Your subscription has ended';
-    if (message) message.textContent = 'Choose a payment method below. Your access is restored only after the payment is verified.';
-  } else if (owner?.subscription_status === 'trial') {
+    if (message) message.textContent = 'Your workspace is paused. Choose PesaPal secure checkout below to restore access. Your access returns only after WiFi Voucher verifies the payment.';
+    if (backBtn) {
+      backBtn.classList.add('hidden');
+      backBtn.disabled = true;
+    }
+    if (logoutBtn) {
+      logoutBtn.textContent = 'Log out';
+      logoutBtn.classList.remove('hidden');
+    }
+    if (checkout) checkout.classList.remove('hidden');
+  } else if (trial) {
     if (title) title.textContent = 'Activate your subscription';
-    if (message) message.textContent = 'You can pay before your trial ends. Your current access stays available while your trial is active.';
+    if (message) message.textContent = 'You can activate your subscription before your trial ends. Your current workspace stays available while the trial is active.';
+    if (backBtn) {
+      backBtn.textContent = 'Back to dashboard';
+      backBtn.classList.remove('hidden');
+      backBtn.disabled = false;
+    }
+    if (logoutBtn) logoutBtn.textContent = 'Log out';
+    if (checkout) checkout.classList.remove('hidden');
   } else {
     if (title) title.textContent = 'Manage your subscription';
-    if (message) message.textContent = 'Choose a payment method below to extend your subscription. Your payment is verified before the subscription is extended.';
+    if (message) message.textContent = 'Choose PesaPal secure checkout below to extend your subscription. Your payment is verified before the subscription is extended.';
+    if (backBtn) {
+      backBtn.textContent = 'Back to dashboard';
+      backBtn.classList.remove('hidden');
+      backBtn.disabled = false;
+    }
+    if (logoutBtn) logoutBtn.textContent = 'Log out';
+    if (checkout) checkout.classList.remove('hidden');
   }
 
   bindPaymentCheckout();
@@ -1267,10 +1303,12 @@ $('recovery-form').addEventListener('submit', handleRecoverySubmit);
 $('logout-btn').addEventListener('click', logout);
 $('expired-logout-btn').addEventListener('click', logout);
 $('subscription-back-btn').addEventListener('click', async () => {
-  if (currentOwner && !isSubscriptionExpired(currentOwner)) {
-    await showOwnerDashboard(currentOwner);
-    resetInactivityTimer();
+  if (!currentOwner || isSubscriptionExpired(currentOwner)) {
+    showToast('Your subscription has ended. Complete payment to return to your workspace.', 'info');
+    return;
   }
+  await showOwnerDashboard(currentOwner);
+  resetInactivityTimer();
 });
 $('subscription-btn').addEventListener('click', () => showSubscriptionScreen(currentOwner));
 bindPaymentCheckout();
