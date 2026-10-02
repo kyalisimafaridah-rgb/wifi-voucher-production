@@ -411,9 +411,9 @@ function renderPaymentInstructions(instructions, payment) {
   if (instructions.mode === 'pesapal_checkout' && instructions.redirect_url) {
     box.innerHTML = `
       <strong>Secure checkout ready</strong>
-      <div>Continue to PesaPal to choose your payment method and complete the payment.</div>
+      <div>You're paying <b>\${escapeHtml(Number(instructions.amount_ugx || payment.amount_ugx).toLocaleString())} UGX</b> for your WiFi Voucher subscription.</div>
       <button type="button" class="btn" id="open-pesapal-checkout" style="margin-top:.75rem">Continue to secure payment</button>
-      <div class="hint" style="margin-top:.5rem">WiFi Voucher verifies the payment directly with PesaPal before restoring access.</div>`;
+      <div class="hint" style="margin-top:.5rem">PesaPal will show any payment-provider charges before you confirm. WiFi Voucher verifies the final payment directly with PesaPal before restoring access.</div>`;
     $('open-pesapal-checkout')?.addEventListener('click', () => window.location.assign(instructions.redirect_url));
     return;
   }
@@ -450,7 +450,12 @@ async function pollPayment(id) {
       await enterDashboard();
       return;
     }
-    if (['failed','expired','cancelled','refunded','disputed'].includes(payment.status)) stopPaymentPolling();
+    if (['failed','expired','cancelled','refunded','disputed'].includes(payment.status)) {
+      stopPaymentPolling();
+      if (status) status.textContent = payment.status === 'failed'
+        ? 'Payment was not completed. You can safely start a new payment.'
+        : 'This payment is no longer active. You can start a new payment.';
+    }
   } catch {
     if ($('payment-status')) $('payment-status').textContent = 'Still checking your payment…';
   }
@@ -485,7 +490,9 @@ async function startPayment(provider) {
     });
 
     renderPaymentInstructions(res.instructions, res.payment);
-    if (status) status.textContent = provider === 'pesapal' ? 'Secure checkout is ready.' : 'Waiting for payment verification…';
+    if (status) status.textContent = provider === 'pesapal'
+      ? 'Opening secure checkout…'
+      : 'Waiting for payment verification…';
     startPaymentPolling(res.payment.id);
 
     if (provider === 'pesapal' && res.instructions.redirect_url) {
