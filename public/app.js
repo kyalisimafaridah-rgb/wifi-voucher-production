@@ -189,7 +189,7 @@ async function handleLockGoogleAuth() {
       provider: 'google',
       options: {
         redirectTo: window.location.origin + '/',
-        scopes: 'openid email profile https://www.googleapis.com/auth/userinfo.email',
+        queryParams: { access_type: 'offline', prompt: 'select_account' },
       },
     });
     if (error) throw error;
@@ -250,24 +250,27 @@ async function handleGoogleAuth(e) {
   e?.preventDefault?.();
   setError('auth-error', null);
   const buttons = [$('login-google-btn'), $('signup-google-btn')].filter(Boolean);
-  buttons.forEach((btn) => setBtnLoading(btn, 'Connecting…'));
+  const returnTo = window.location.origin + '/';
+  buttons.forEach((btn) => setBtnLoading(btn, 'Opening Google…'));
   try {
     const { error } = await window.__wvSupabaseClient.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin + '/',
-        scopes: 'openid email profile https://www.googleapis.com/auth/userinfo.email',
+        redirectTo: returnTo,
+        queryParams: { access_type: 'offline', prompt: 'select_account' },
       },
     });
     if (error) throw error;
   } catch (err) {
     const msg = err?.message || '';
-    setError(
-      'auth-error',
-      /provider.*not.*enabled|provider is not enabled/i.test(msg)
-        ? 'Google sign-in is not enabled yet. Email login is ready; the app owner needs to finish Google setup in Supabase.'
-        : msg || 'Google sign-in failed. Please try again.'
-    );
+    const friendly = /provider.*not.*enabled|provider is not enabled/i.test(msg)
+      ? 'Google sign-in is not enabled for this workspace yet.'
+      : /redirect|redirect_uri|not.*allowed/i.test(msg)
+        ? 'Google sign-in is almost ready, but the Google redirect address is not configured correctly.'
+        : /popup|cancel/i.test(msg)
+          ? 'Google sign-in was cancelled. You can try again when you are ready.'
+          : msg || 'Google sign-in failed. Please try again.';
+    setError('auth-error', friendly);
     buttons.forEach((btn) => resetBtn(btn));
   }
 }
@@ -1500,6 +1503,17 @@ if ('serviceWorker' in navigator) {
 }
 
 (async () => {
+  const oauthParams = new URLSearchParams(window.location.search);
+  const oauthError = oauthParams.get('error');
+  const oauthErrorDescription = oauthParams.get('error_description');
+  if (oauthError) {
+    const message = oauthError === 'access_denied'
+      ? 'Google sign-in was cancelled.'
+      : (oauthErrorDescription ? decodeURIComponent(oauthErrorDescription.replace(/\+/g, ' ')) : 'Google sign-in could not be completed.');
+    setError('auth-error', message);
+    history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+  }
+
   // If this page load is a password-recovery link, show that screen immediately
   if (window.location.hash.includes('type=recovery')) {
     hideAllScreens();
